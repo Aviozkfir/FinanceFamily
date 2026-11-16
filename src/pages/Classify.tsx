@@ -56,7 +56,7 @@ function Bubble({ item, color, selected, onToggle }: { item: Item; color: string
   const title = item.txs.slice(0, 12).map((t) => `${dayLabel(t.date, lang)} · ${money(t.amount, lang, true)}${t.note ? ` · ${t.note}` : ''}${t.origAmount != null ? ` (${t.origCurrency}${t.origAmount})` : ''}`).join('\n');
   return (
     <button ref={setNodeRef} {...listeners} {...attributes} type="button" onClick={onToggle} title={title} aria-pressed={selected}
-      className={cx('max-w-full cursor-grab touch-manipulation rounded-full', isDragging && 'opacity-30')}>
+      className={cx('pop press max-w-full cursor-grab touch-manipulation rounded-full', isDragging && 'opacity-30')}>
       <BubbleBody item={item} color={color} selected={selected} />
     </button>
   );

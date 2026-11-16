@@ -9,7 +9,7 @@ import { dayLabel, isMonthKey, merchantKey, money, monthLabel, pct, statementMon
 import { analyzeMonth, previousAnalysis } from '../lib/analysis/compute';
 import { buildInsights, topInsights, type Tone } from '../lib/analysis/insights';
 import { sourceOf } from '../lib/learn';
-import { BUCKET_COLOR, Button, Card, CardTitle, Dot, Empty, Money, MonthSwitcher, PageHeader, Segmented, cx } from '../components/ui';
+import { BUCKET_COLOR, Button, Card, CardTitle, CountMoney, Dot, Empty, Meter, Money, MonthSwitcher, PageHeader, Segmented, cx } from '../components/ui';
 import { DailyChart, MonthPicture } from '../components/charts';
 
 const TONE_ICON: Record<Tone, React.ReactNode> = {
@@ -137,7 +137,7 @@ export default function AnalysisPage() {
           <>
             <p className="text-sm text-ink2">{a.leftover >= 0 ? L('חסכת החודש', 'You saved this month') : L('הוצאת יותר ממה שהכנסת', 'You spent more than you earned')}</p>
             <p className="mt-0.5 flex flex-wrap items-baseline gap-x-3">
-              <Money value={a.leftover} className={cx('text-4xl font-bold tracking-tight', a.leftover < 0 && 'text-bad')} />
+              <CountMoney value={a.leftover} className={cx('text-4xl font-bold tracking-tight', a.leftover < 0 && 'text-bad')} />
               {a.leftover >= 0 && <span className="text-sm text-ink2">{pct(a.savingsRate ?? 0)} {L('מההכנסה', 'of income')}{a.target.invest > 0 && <> · {L('היעד', 'target')} {a.split.invest}%</>}</span>}
             </p>
             {a.target.invest > 0 && a.leftover >= 0 && (
@@ -150,7 +150,7 @@ export default function AnalysisPage() {
         ) : (
           <>
             <p className="text-sm text-ink2">{L('הוצאת החודש', 'You spent this month')}</p>
-            <Money value={a.totalSpent} className="mt-0.5 block text-4xl font-bold tracking-tight" />
+            <CountMoney value={a.totalSpent} className="mt-0.5 block text-4xl font-bold tracking-tight" />
             <p className="mt-1.5 flex flex-wrap items-center gap-x-2 text-sm text-ink2"><TriangleAlert size={16} className="text-warn" />{L('לא הוזנה הכנסה, אז אי אפשר לחשב חיסכון.', 'No income was entered, so savings cannot be calculated.')}
               <Link to={`/month/${key}`} className="font-semibold text-accent hover:underline">{L('הוסף הכנסה', 'Add income')}</Link></p>
           </>
@@ -160,7 +160,8 @@ export default function AnalysisPage() {
 
         <ul className="mt-4 divide-y divide-line">
           {rows.filter((r) => r.b !== 'invest' || hasIncome).map((r) => (
-            <li key={r.b} className="flex items-center gap-3 py-2.5">
+            <li key={r.b} className="py-3">
+             <div className="flex items-center gap-3">
               <Dot color={BUCKET_COLOR[r.b]} className="!h-3 !w-3" />
               <div className="min-w-0 flex-1">
                 <p className="font-medium">{bucketName(r.b, lang)}</p>
@@ -177,6 +178,9 @@ export default function AnalysisPage() {
                 <Money value={r.actual} className="font-semibold" />
                 {r.target > 0 && <p className="text-[13px] text-muted">{L('מתוך', 'of')} <Money value={r.target} /></p>}
               </div>
+             </div>
+             {r.target > 0 && <div className="mt-2"><Meter value={r.actual} target={r.target} color={BUCKET_COLOR[r.b]} soft={`var(--${r.b}-soft)`} overIsBad={r.b !== 'invest'}
+               label={`${bucketName(r.b, lang)}: ${money(r.actual, lang)} ${L('מתוך', 'of')} ${money(r.target, lang)}`} /></div>}
             </li>
           ))}
         </ul>
@@ -248,12 +252,12 @@ export default function AnalysisPage() {
               const isOpen = openCat === c.id;
               return (
                 <li key={c.id}>
-                  <button type="button" onClick={() => { setOpenCat(isOpen ? null : c.id); setOpen(null); setShowAll(false); }} aria-expanded={isOpen} className="-mx-2 block w-[calc(100%+1rem)] rounded-xl px-2 py-2 text-start hover:bg-surface2">
+                  <button type="button" onClick={() => { setOpenCat(isOpen ? null : c.id); setOpen(null); setShowAll(false); }} aria-expanded={isOpen} className="press -mx-2 block w-[calc(100%+1rem)] rounded-xl px-2 py-2 text-start hover:bg-surface2">
                     <span className="mb-1.5 flex items-baseline justify-between gap-3">
                       <span className="min-w-0 truncate font-medium">{categoryName(catById.get(c.id), lang)}<span className="ms-2 text-xs font-normal text-muted">{tabTotal > 0 ? pct(c.total / tabTotal) : ''}</span></span>
                       <span className="flex shrink-0 items-center gap-1"><Money value={c.total} className="font-semibold" /><ChevronDown size={15} className={cx('text-muted transition-transform', isOpen && 'rotate-180')} /></span>
                     </span>
-                    <span className="block h-2.5 rounded-full bg-surface2"><span className="block h-full rounded-full" style={{ width: `${Math.max((Math.max(c.total, 0) / maxCat) * 100, 1)}%`, background: tabColor }} /></span>
+                    <span className="block h-2.5 rounded-full bg-surface2"><span className="grow block h-full rounded-full" style={{ width: `${Math.max((Math.max(c.total, 0) / maxCat) * 100, 1)}%`, background: tabColor }} /></span>
                   </button>
                   {isOpen && <div className="mb-3 ms-3 mt-1 border-s-2 border-line ps-3">
           <ul className="space-y-1">
@@ -266,7 +270,7 @@ export default function AnalysisPage() {
                         <span className="min-w-0 truncate"><bdi>{x.name}</bdi>{x.count > 1 && <span className="ms-1.5 text-xs text-muted">×{x.count}</span>}</span>
                         <span className="flex shrink-0 items-center gap-1"><Money value={x.total} className="font-semibold" />{!x.manual && <ChevronDown size={14} className={cx('text-muted transition-transform', isOpen && 'rotate-180')} />}</span>
                       </span>
-                      <span className="block h-1.5 rounded-full bg-surface2"><span className="block h-full rounded-full" style={{ width: `${Math.max((x.total / maxMerchant) * 100, 1)}%`, background: tabColor }} /></span>
+                      <span className="block h-1.5 rounded-full bg-surface2"><span className="grow block h-full rounded-full" style={{ width: `${Math.max((x.total / maxMerchant) * 100, 1)}%`, background: tabColor }} /></span>
                     </button>
                     {isOpen && (
                       <ul className="mb-2 mt-1 divide-y divide-line rounded-xl bg-surface2 px-3 text-sm">
@@ -306,7 +310,7 @@ export default function AnalysisPage() {
                       <span className="min-w-0 truncate"><bdi>{x.name}</bdi>{x.count > 1 && <span className="ms-1.5 text-xs text-muted">×{x.count}</span>}</span>
                       <span className="flex shrink-0 items-center gap-1"><Money value={x.total} className="font-semibold" />{!x.manual && <ChevronDown size={14} className={cx('text-muted transition-transform', isOpen && 'rotate-180')} />}</span>
                     </span>
-                    <span className="block h-1.5 rounded-full bg-surface2"><span className="block h-full rounded-full" style={{ width: `${Math.max((x.total / maxMerchant) * 100, 1)}%`, background: tabColor }} /></span>
+                    <span className="block h-1.5 rounded-full bg-surface2"><span className="grow block h-full rounded-full" style={{ width: `${Math.max((x.total / maxMerchant) * 100, 1)}%`, background: tabColor }} /></span>
                   </button>
                   {isOpen && (
                     <ul className="mb-2 mt-1 divide-y divide-line rounded-xl bg-surface2 px-3 text-sm">

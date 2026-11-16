@@ -181,7 +181,7 @@ export default function MonthPage() {
                   {classified < m.txs.length && <Pill tone="warn">{L(`נותרו ${m.txs.length - classified}`, `${m.txs.length - classified} left`)}</Pill>}
                 </span>
               </div>
-              <div className="h-2 rounded-full bg-surface3"><div className="h-full rounded-full bg-accent transition-all" style={{ width: `${(classified / m.txs.length) * 100}%` }} /></div>
+              <div className="h-2 rounded-full bg-surface3"><div className="grow h-full rounded-full bg-accent transition-all" style={{ width: `${(classified / m.txs.length) * 100}%` }} /></div>
             </div>
             <Button variant={classified < m.txs.length || guesses > 0 ? 'primary' : 'soft'} icon={<LayoutGrid size={16} />} onClick={() => navigate(`/month/${key}/classify`)}>
               {classified < m.txs.length || guesses > 0 ? L('פתח את לוח הסיווג', 'Open the board') : L('עריכת הסיווג', 'Edit classification')}

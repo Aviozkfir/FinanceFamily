@@ -4,7 +4,7 @@ import { ArrowLeft, ArrowRight, CalendarPlus, CircleCheck, ListChecks, Target } 
 import { useL, useLang, useStore } from '../lib/store';
 import { money, monthLabel, pct, shiftMonth, statementMonth } from '../lib/format';
 import { analyzeMonth, filledMonths } from '../lib/analysis/compute';
-import { Card, CardTitle, Money, cx } from '../components/ui';
+import { Card, CardTitle, CountMoney, cx } from '../components/ui';
 import { MonthPicture } from '../components/charts';
 
 export default function Home() {
@@ -43,7 +43,7 @@ export default function Home() {
   return (
     <div className="rise space-y-4">
       {step ? (
-        <Link to={step.to} className="group relative block overflow-hidden rounded-3xl border border-line bg-surface p-6 shadow-[var(--shadow)] transition-colors hover:border-line-strong">
+        <Link to={step.to} className="press group relative block overflow-hidden rounded-3xl border border-line bg-surface p-6 shadow-[var(--shadow)] transition-colors hover:border-line-strong">
           <div aria-hidden className="pointer-events-none absolute -end-10 -top-10 h-40 w-40 rounded-full bg-accent opacity-[0.13] blur-2xl" />
           <p className="flex items-center gap-2 text-[13px] font-medium text-accent"><step.icon size={16} />{L('הצעד הבא', 'Next step')}</p>
           <h1 className="mt-2 text-2xl font-bold leading-tight tracking-tight">{step.title}</h1>
@@ -66,11 +66,11 @@ export default function Home() {
           {latest.income > 0 ? (
             <p className="mb-4 flex flex-wrap items-baseline gap-x-3">
               <span className="text-sm text-ink2">{latest.leftover >= 0 ? L('חסכת', 'You saved') : L('חרגת ב-', 'You overspent by')}</span>
-              <Money value={Math.abs(latest.leftover)} className={cx('text-3xl font-bold tracking-tight', latest.leftover < 0 && 'text-bad')} />
+              <CountMoney value={Math.abs(latest.leftover)} className={cx('text-3xl font-bold tracking-tight', latest.leftover < 0 && 'text-bad')} />
               {latest.leftover >= 0 && <span className="text-sm text-ink2">{pct(latest.savingsRate ?? 0)} {L('מההכנסה', 'of income')}</span>}
             </p>
           ) : (
-            <p className="mb-4 flex flex-wrap items-baseline gap-x-3"><span className="text-sm text-ink2">{L('הוצאת', 'You spent')}</span><Money value={latest.totalSpent} className="text-3xl font-bold tracking-tight" /></p>
+            <p className="mb-4 flex flex-wrap items-baseline gap-x-3"><span className="text-sm text-ink2">{L('הוצאת', 'You spent')}</span><CountMoney value={latest.totalSpent} className="text-3xl font-bold tracking-tight" /></p>
           )}
           <MonthPicture a={latest} legend />
         </Card>

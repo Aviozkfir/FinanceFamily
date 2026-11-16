@@ -7,7 +7,7 @@ import { merchantKey, monthLabel, pct } from '../lib/format';
 import { analyzeMany, buildForecast } from '../lib/analysis/forecast';
 import OverTimeTabs from '../components/OverTimeTabs';
 import { BUCKET_COLOR, Card, CardTitle, Dot, Empty, Money, PageHeader, cx } from '../components/ui';
-import { MonthsChart, RankBars } from '../components/charts';
+import { MonthsChart, RankBars, Sparkline } from '../components/charts';
 
 export default function TrendsPage() {
   const L = useL();
@@ -69,14 +69,16 @@ export default function TrendsPage() {
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        {[
-          [L('הכנסה ממוצעת', 'Average income'), <Money value={avg((a) => a.income)} />],
-          [L('הוצאה ממוצעת', 'Average spending'), <Money value={avg((a) => a.totalSpent)} />],
-          [L('עודף ממוצע', 'Average surplus'), <Money value={avg((a) => a.leftover)} />],
-          [L('שיעור חיסכון ממוצע', 'Average savings rate'), avgRate == null ? '—' : pct(avgRate)],
-        ].map(([label, value], i) => (
+        {([
+          [L('הכנסה ממוצעת', 'Average income'), <Money value={avg((a) => a.income)} />, analyses.map((a) => a.income)],
+          [L('הוצאה ממוצעת', 'Average spending'), <Money value={avg((a) => a.totalSpent)} />, analyses.map((a) => a.totalSpent)],
+          [L('חיסכון ממוצע', 'Average saved'), <Money value={avg((a) => a.leftover)} />, analyses.map((a) => a.leftover)],
+          [L('שיעור חיסכון ממוצע', 'Average savings rate'), avgRate == null ? '—' : pct(avgRate), withIncome.map((a) => a.savingsRate ?? 0)],
+        ] as [string, React.ReactNode, number[]][]).map(([label, value, series], i) => (
           <Card key={i} className="!p-4"><p className="text-[13px] text-muted">{label}</p><p className="mt-1 text-2xl font-bold tracking-tight">{value}</p>
-            <p className="mt-0.5 text-xs text-muted">{L(`על פני ${n} חודשים`, `Across ${n} month${n > 1 ? 's' : ''}`)}</p></Card>
+            {series.length > 1
+              ? <div className="mt-2" dir="ltr" title={L('מהחודש הראשון שנבחר עד האחרון', 'From the first selected month to the last')}><Sparkline values={series} /></div>
+              : <p className="mt-0.5 text-xs text-muted">{L(`על פני ${n} חודשים`, `Across ${n} month${n > 1 ? 's' : ''}`)}</p>}</Card>
         ))}
       </div>
 

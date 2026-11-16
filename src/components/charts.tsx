@@ -279,7 +279,7 @@ export function RankBars({ rows, lang }: { rows: { key: string; label: string; s
             <span className="num shrink-0 font-semibold" dir="ltr">{money(r.value, lang)}</span>
           </div>
           <div className="h-1.5 rounded-full bg-surface2">
-            <div className="h-full rounded-full" style={{ width: `${Math.max((Math.max(r.value, 0) / max) * 100, 1)}%`, background: r.color }} />
+            <div className="grow h-full rounded-full" style={{ width: `${Math.max((Math.max(r.value, 0) / max) * 100, 1)}%`, background: r.color }} />
           </div>
         </div>
       ))}
@@ -313,14 +313,14 @@ export function MonthPicture({ a, legend }: { a: MonthAnalysis; legend?: boolean
         <span>{L('בפועל', 'Actual')}</span>
         <div className="relative">
           <div className={cx(row, 'h-7')}>
-            {actual.map((x) => <div key={x.id} title={`${x.label} · ${money(x.value, lang)}`} style={{ width: w(x.value), background: x.color }} />)}
+            {actual.map((x) => <div key={x.id} className="grow" title={`${x.label} · ${money(x.value, lang)}`} style={{ width: w(x.value), background: x.color }} />)}
           </div>
           {over && <div className="absolute -inset-y-1 w-0.5 rounded bg-ink" style={{ insetInlineStart: w(a.income) }} title={L('הכנסה', 'Income')} />}
         </div>
         {planned.length > 0 && <>
           <span>{L('יעד', 'Plan')}</span>
           <div className={cx(row, 'h-2.5')}>
-            {planned.map((x) => <div key={x.id} className="opacity-50" title={`${x.label} · ${money(x.value, lang)}`} style={{ width: w(x.value), background: x.color }} />)}
+            {planned.map((x) => <div key={x.id} className="grow-late opacity-50" title={`${x.label} · ${money(x.value, lang)}`} style={{ width: w(x.value), background: x.color }} />)}
           </div>
         </>}
       </div>
@@ -331,5 +331,20 @@ export function MonthPicture({ a, legend }: { a: MonthAnalysis; legend?: boolean
         </ul>
       )}
     </div>
+  );
+}
+
+// ---------- sparkline: how one figure moved over the months ----------
+/** A small line with no axes. The line is quiet; the last point, the current value, is marked. */
+export function Sparkline({ values, width = 120, height = 32 }: { values: number[]; width?: number; height?: number }) {
+  if (values.length < 2) return null;
+  const min = Math.min(...values), max = Math.max(...values), span = max - min || 1, pad = 4;
+  const pts = values.map((v, i) => [pad + (i / (values.length - 1)) * (width - pad * 2), pad + (1 - (v - min) / span) * (height - pad * 2)] as const);
+  const [lx, ly] = pts[pts.length - 1];
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden className="max-w-full overflow-visible">
+      <polyline points={pts.map((p) => p.join(',')).join(' ')} fill="none" stroke="var(--neutral-mark)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx={lx} cy={ly} r={4} fill="var(--accent)" stroke="var(--surface)" strokeWidth={2} />
+    </svg>
   );
 }

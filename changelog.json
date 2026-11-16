@@ -1,5 +1,19 @@
 [
   {
+    "version": "1.7.0",
+    "date": "2026-11-16",
+    "he": [
+      "תנועה: כפתורים מגיבים ללחיצה, פסים גדלים לגודלם, והמספר הראשי נספר עד לערכו.",
+      "מדים במקום מספרים: צרכים, רצונות וחיסכון מוצגים כפס מול קו היעד.",
+      "במגמות: כל ממוצע מוצג עם קו קטן שמראה איך הוא השתנה מחודש לחודש."
+    ],
+    "en": [
+      "Motion: buttons respond to a press, bars grow to their size, and the headline number counts up to its value.",
+      "Meters instead of numbers: needs, wants and savings are shown as a bar against the target line.",
+      "In trends: each average comes with a small line showing how it moved from month to month."
+    ]
+  },
+  {
     "version": "1.6.2",
     "date": "2026-11-16",
     "he": [
