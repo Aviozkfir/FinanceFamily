@@ -1,5 +1,17 @@
 [
   {
+    "version": "1.2.2",
+    "date": "2026-11-16",
+    "he": [
+      "גרסאות פיתוח: בהגדרות אפשר לבחור לקבל גרסאות שעדיין בבדיקה, ולחזור לגרסה היציבה בכל רגע.",
+      "לפני מעבר מגרסה יציבה נשמר עותק של הנתונים, ואפשר לשחזר אותו מההגדרות."
+    ],
+    "en": [
+      "Developer versions: in Settings you can choose to receive versions still being tested, and go back to the stable version at any time.",
+      "A copy of your data is kept before leaving a stable version and can be restored from Settings."
+    ]
+  },
+  {
     "version": "1.2.1",
     "date": "2026-11-16",
     "he": [

@@ -8,6 +8,9 @@
 //            When it is higher than the installed app's, the update needs a new APK;
 //            otherwise the app only swaps its web content.
 //
+//   channel  'stable' for a build of main, 'dev' for a build of any other branch (APP_CHANNEL,
+//            set by the GitHub action). Phones follow stable unless developer versions are
+//            switched on in Settings.
 //   notes    what changed in this version, from changelog.json at the repo root (he / en lines).
 //            It travels in the release notes, so an app can show it before updating.
 //
@@ -42,6 +45,7 @@ export function getVersion() {
     build: stamp(time),
     native: stamp(git('log', '-1', '--format=%ct', '--', ...NATIVE_PATHS)),
     commit: git('rev-parse', '--short', 'HEAD'),
+    channel: process.env.APP_CHANNEL === 'stable' ? 'stable' : 'dev',
     date: time ? new Date(Number(time) * 1000).toISOString() : '',
   };
 }
