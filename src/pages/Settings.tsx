@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Download, RefreshCw, Trash2, Upload } from 'lucide-react';
+import { ChevronDown, Download, FileSpreadsheet, RefreshCw, Send, Trash2, Upload } from 'lucide-react';
 import type { BucketId, DB, Split } from '../lib/types';
 import { SPEND_BUCKETS } from '../lib/types';
 import { bucketName, categoryName, useL, useLang, useStore } from '../lib/store';
@@ -7,7 +7,29 @@ import { isNative } from '../lib/platform';
 import { buildModel } from '../lib/learn';
 import { CURRENT, checkForUpdate, currentChannel, installUpdate, readSnapshot, setChannel, snapshotDate, useUpdate } from '../lib/update';
 import { CHANGELOG, linesOf } from '../lib/changelog';
-import { BUCKET_COLOR, Button, Card, CardTitle, Dot, IconButton, PageHeader, Pill, Segmented, TextInput, cx } from '../components/ui';
+import { exportBackup, exportTransactions } from '../lib/files';
+import { feedbackEnabled, sendFeedback, type FeedbackKind } from '../lib/feedback';
+import { EulaBody } from '../components/Eula';
+import { BUCKET_COLOR, Button, Dot, IconButton, PageHeader, Pill, Segmented, TextInput, cx } from '../components/ui';
+
+/**
+ * One settings section. Closed, it shows its name and the current value, so the page reads as a
+ * short list and nothing is hidden behind a tap just to learn what it is set to.
+ */
+function Section({ title, summary, children }: { title: string; summary?: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <details className="group rounded-2xl border border-line bg-surface shadow-[var(--shadow)]">
+      <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-4 [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] font-semibold">{title}</span>
+          {summary != null && <span className="block truncate text-[13px] text-muted group-open:hidden">{summary}</span>}
+        </span>
+        <ChevronDown size={18} className="shrink-0 text-muted transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="px-5 pb-5">{children}</div>
+    </details>
+  );
+}
 
 export default function SettingsPage() {
   const L = useL();
@@ -31,11 +53,17 @@ export default function SettingsPage() {
   const splitSum = split.needs + split.wants + split.invest;
   useEffect(() => { if (splitSum === 100) setSettings({ split }); }, [split]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  function exportData() {
-    const url = URL.createObjectURL(new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' }));
-    const a = document.createElement('a');
-    a.href = url; a.download = `finance-backup-${new Date().toISOString().slice(0, 10)}.json`; a.click();
-    URL.revokeObjectURL(url);
+  async function runExport(fn: () => Promise<void>) {
+    try { await fn(); setImportMsg(''); } catch { setImportMsg(L('הייצוא נכשל.', 'The export failed.')); }
+  }
+  const [fbKind, setFbKind] = useState<FeedbackKind>('bug');
+  const [fbText, setFbText] = useState('');
+  const [fbContact, setFbContact] = useState('');
+  const [fbState, setFbState] = useState<'idle' | 'sending' | 'sent' | 'failed'>('idle');
+  async function submitFeedback() {
+    setFbState('sending');
+    try { await sendFeedback({ kind: fbKind, message: fbText.trim(), contact: fbContact.trim(), lang }); setFbText(''); setFbState('sent'); }
+    catch { setFbState('failed'); }
   }
   async function importData(file: File) {
     try {
@@ -50,21 +78,20 @@ export default function SettingsPage() {
   const learned = useMemo(() => buildModel(db).known.size, [db]);
 
   return (
-    <div className="rise max-w-3xl space-y-4">
+    <div className="rise max-w-3xl space-y-3">
       <PageHeader title={L('הגדרות', 'Settings')} />
 
-      <Card>
-        <CardTitle>{L('תצוגה', 'Display')}</CardTitle>
+      <Section title={L('תצוגה', 'Display')} summary={`${s.lang === 'he' ? 'עברית' : 'English'} · ${s.theme === 'dark' ? L('כהה', 'Dark') : L('בהירה', 'Light')}`}>
         <div className="flex flex-wrap gap-6">
           <div><p className="mb-1.5 text-sm text-ink2">{L('שפה', 'Language')}</p>
             <Segmented value={s.lang} onChange={(v) => setSettings({ lang: v })} options={[{ value: 'he', label: 'עברית' }, { value: 'en', label: 'English' }]} /></div>
           <div><p className="mb-1.5 text-sm text-ink2">{L('ערכת צבעים', 'Theme')}</p>
             <Segmented value={s.theme} onChange={(v) => setSettings({ theme: v })} options={[{ value: 'dark', label: L('כהה', 'Dark') }, { value: 'light', label: L('בהירה', 'Light') }]} /></div>
         </div>
-      </Card>
+      </Section>
 
-      <Card>
-        <CardTitle hint={L('משמשת כשלא הוגדר יעד לחודש, וכברירת מחדל ליעדים חדשים', 'Used when a month has no goal, and as the default for new goals')}>{L('חלוקת ברירת מחדל', 'Default split')}</CardTitle>
+      <Section title={L('תקציב', 'Budget')} summary={<bdi>{L(`חלוקה ${s.split.needs}/${s.split.wants}/${s.split.invest} · חיוב ב-${s.billingDay} בחודש`, `Split ${s.split.needs}/${s.split.wants}/${s.split.invest} · charged on day ${s.billingDay}`)}</bdi>}>
+        <p className="mb-3 text-[13px] text-muted">{L('החלוקה משמשת כשלא הוגדר יעד לחודש, וכברירת מחדל ליעדים חדשים.', 'The split is used when a month has no goal, and as the default for new goals.')}</p>
         <div className="grid max-w-md grid-cols-3 gap-3">
           {SPEND_BUCKETS.map((b) => (
             <label key={b}><span className="mb-1.5 flex items-center gap-1.5 text-[13px] text-ink2"><Dot color={BUCKET_COLOR[b]} />{bucketName(b, lang)}</span>
@@ -80,10 +107,10 @@ export default function SettingsPage() {
             className="num h-10 w-24 rounded-xl border border-line bg-surface2 px-3 text-sm font-semibold focus:border-accent focus:outline-none" />
           <span className="mt-1 block text-xs text-muted">{L('חודש באפליקציה הוא דף החיוב שיורד ביום הזה. מהיום הזה והלאה האפליקציה מציעה לסכם את החודש הנוכחי.', 'A month in the app is the statement charged on this day. From this day on, the app offers to wrap up the current month.')}</span></label>
         {splitSum !== 100 && <p role="alert" className="mt-3 text-sm text-bad">{L(`החלוקה מסתכמת ב-${splitSum}% — היא תישמר כשתגיע ל-100%.`, `The split adds up to ${splitSum}% — it is saved once it totals 100%.`)}</p>}
-      </Card>
+      </Section>
 
-      <Card>
-        <CardTitle hint={L('אפשר לשנות שם, להעביר בין צרכים לרצונות או למחוק. קטגוריות חדשות מוסיפים מלוח הסיווג', 'Rename, move between needs and wants, or delete. New categories are added from the classification board')}>{L('קטגוריות', 'Categories')}</CardTitle>
+      <Section title={L('קטגוריות', 'Categories')} summary={L(`${custom.length} קטגוריות · ${learned} בתי עסק נלמדו`, `${custom.length} categories · ${learned} merchants learned`)}>
+        <p className="mb-3 text-[13px] text-muted">{L('אפשר לשנות שם, להעביר בין צרכים לרצונות או למחוק. קטגוריות חדשות מוסיפים מלוח הסיווג.', 'Rename, move between needs and wants, or delete. New categories are added from the classification board.')}</p>
         {custom.length ? (
           <ul className="space-y-2">
             {custom.map((c) => (
@@ -102,10 +129,9 @@ export default function SettingsPage() {
         <p className="mt-4 border-t border-line pt-3 text-[13px] text-muted">
           {L(`האפליקציה למדה ממך ${learned} בתי עסק, ומסווגת אותם ודומים להם לבד בקובץ הבא. היא לומדת רק מבחירות שעשית או אישרת, במכשיר הזה בלבד.`, `The app has learned ${learned} merchants from you, and classifies them and similar ones automatically next time. It learns only from choices you made or confirmed, on this device only.`)}
         </p>
-      </Card>
+      </Section>
 
-      <Card>
-        <CardTitle hint={native ? L('כשמתפרסמת גרסה חדשה מופיע כפתור עדכון בראש המסך', 'When a new version is published, an Update button appears at the top of the screen') : undefined}>{L('גרסה ועדכונים', 'Version and updates')}</CardTitle>
+      <Section title={L('גרסה ועדכונים', 'Version and updates')} summary={<><bdi dir="ltr">{CURRENT.version}</bdi>{native && currentChannel() === 'dev' ? ` · ${L('גרסת פיתוח', 'developer build')}` : ''}{update.phase === 'available' && update.latest ? ` · ${L('יש עדכון', 'update available')}` : ''}</>}>
         <p className="text-sm">
           <span className="font-semibold">{L('גרסה', 'Version')} <bdi dir="ltr">{CURRENT.version}</bdi>{native && currentChannel() === 'dev' && <> · {L('גרסת פיתוח', 'developer build')}</>}</span>
           {CURRENT.build > 0 && <span className="text-muted"> · <bdi dir="ltr">{L('בנייה', 'build')} {CURRENT.build} · {CURRENT.commit} · {CURRENT.date.slice(0, 10)}</bdi></span>}
@@ -159,17 +185,44 @@ export default function SettingsPage() {
             )}
           </>
         )}
-      </Card>
+      </Section>
 
-      <Card>
-        <CardTitle hint={native ? L('הנתונים נשמרים במכשיר הזה בלבד. אפשר לטעון לכאן גיבוי שהורד מהמחשב.', 'Data is stored on this device only. You can load a backup downloaded on the computer.') : L('הנתונים נשמרים בקובץ data/db.json בתיקיית האפליקציה, עם גיבוי יומי אוטומטי', 'Data lives in data/db.json inside the app folder, with an automatic daily backup')}>{L('הנתונים שלי', 'My data')}</CardTitle>
+      <Section title={L('הנתונים שלי', 'My data')} summary={native ? L('נשמרים במכשיר הזה בלבד · גיבוי וייצוא', 'Stored on this device only · backup and export') : L('נשמרים במחשב הזה · גיבוי וייצוא', 'Stored on this computer · backup and export')}>
+        <p className="mb-3 text-[13px] text-muted">
+          {L('גיבוי הוא קובץ אחד שמכיל את כל מה שיש באפליקציה: החודשים, העסקאות, הקטגוריות, מה שהאפליקציה למדה ממך וההגדרות. שמור אותו במקום בטוח; "שחזר מגיבוי" מחזיר הכול ממנו, גם במכשיר אחר.',
+            'A backup is one file holding everything in the app: the months, the transactions, the categories, what the app learned from you and the settings. Keep it somewhere safe; "Restore from backup" brings it all back, on another device too.')}
+          {native ? L(' הנתונים נשמרים במכשיר הזה בלבד, ולכן כדאי לגבות מדי פעם.', ' The data lives on this device only, so back it up now and then.') : L(' במחשב הנתונים נשמרים ב-data/db.json, עם גיבוי יומי אוטומטי.', ' On the computer the data lives in data/db.json, with an automatic daily backup.')}
+        </p>
         <div className="flex flex-wrap items-center gap-2">
-          {!native && <Button icon={<Download size={16} />} onClick={exportData}>{L('הורד גיבוי', 'Download backup')}</Button>}
+          <Button icon={<Download size={16} />} onClick={() => void runExport(() => exportBackup(db))}>{native ? L('שמור גיבוי', 'Save a backup') : L('הורד גיבוי', 'Download backup')}</Button>
           <Button icon={<Upload size={16} />} onClick={() => importRef.current?.click()}>{L('שחזר מגיבוי', 'Restore from backup')}</Button>
+          <Button icon={<FileSpreadsheet size={16} />} onClick={() => void runExport(() => exportTransactions(db, lang))}>{L('ייצא עסקאות לאקסל', 'Export transactions to Excel')}</Button>
           <input ref={importRef} type="file" accept=".json,application/json" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) importData(f); e.target.value = ''; }} />
-          {importMsg && <span role="status" className="text-sm text-ink2">{importMsg}</span>}
         </div>
-      </Card>
+        {importMsg && <p role="status" className="mt-2 text-sm text-ink2">{importMsg}</p>}
+      </Section>
+
+      {feedbackEnabled() && (
+        <Section title={L('משוב ודיווח על תקלה', 'Feedback and bug reports')} summary={L('נשלח ישירות למפתח', 'Goes straight to the developer')}>
+          <form className="space-y-3" onSubmit={(e) => { e.preventDefault(); if (fbText.trim()) void submitFeedback(); }}>
+            <Segmented size="sm" value={fbKind} onChange={setFbKind} options={[{ value: 'bug', label: L('תקלה', 'Bug') }, { value: 'idea', label: L('רעיון', 'Idea') }, { value: 'other', label: L('אחר', 'Other') }]} />
+            <textarea value={fbText} onChange={(e) => { setFbText(e.target.value); if (fbState !== 'sending') setFbState('idle'); }} rows={4} maxLength={4000}
+              placeholder={fbKind === 'bug' ? L('מה עשית, מה קרה, ומה ציפית שיקרה?', 'What did you do, what happened, and what did you expect?') : L('מה היית רוצה לראות באפליקציה?', 'What would you like to see in the app?')}
+              className="w-full rounded-xl border border-line bg-surface2 px-3 py-2 text-sm text-ink placeholder:text-muted focus:border-accent focus:outline-none" />
+            <TextInput value={fbContact} onChange={(e) => setFbContact(e.target.value)} placeholder={L('איך לחזור אליך (לא חובה)', 'How to reach you (optional)')} />
+            <p className="text-xs text-muted">{L('נשלחים הטקסט שכתבת, מספר הגרסה וסוג המכשיר. שום נתון פיננסי לא נשלח.', 'Your text, the version number and the device type are sent. No financial data is sent.')}</p>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button type="submit" variant="primary" icon={<Send size={15} />} disabled={!fbText.trim() || fbState === 'sending'}>{fbState === 'sending' ? L('שולח…', 'Sending…') : L('שלח', 'Send')}</Button>
+              {fbState === 'sent' && <span role="status" className="text-sm text-good">{L('נשלח. תודה!', 'Sent. Thank you!')}</span>}
+              {fbState === 'failed' && <span role="alert" className="text-sm text-bad">{L('השליחה נכשלה. בדוק את החיבור ונסה שוב.', 'Sending failed. Check your connection and try again.')}</span>}
+            </div>
+          </form>
+        </Section>
+      )}
+
+      <Section title={L('תנאי שימוש', 'Terms of use')}>
+        <EulaBody />
+      </Section>
     </div>
   );
 }

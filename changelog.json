@@ -1,5 +1,21 @@
 [
   {
+    "version": "1.6.0",
+    "date": "2026-11-16",
+    "he": [
+      "גיבוי וייצוא מהטלפון: בהגדרות אפשר לשמור קובץ גיבוי ולייצא את כל העסקאות לאקסל.",
+      "ההגדרות מסודרות כרשימה קצרה: כל סעיף מציג את המצב הנוכחי ונפתח בלחיצה.",
+      "בניתוח החודש: מה השתנה מהחודש הקודם, לפי קטגוריה.",
+      "תנאי שימוש מוצגים בפתיחה הראשונה, ונמצאים גם בהגדרות."
+    ],
+    "en": [
+      "Backup and export on the phone: in Settings you can save a backup file and export every transaction to Excel.",
+      "Settings is a short list: each section shows its current state and opens with a tap.",
+      "In the month analysis: what changed since last month, by category.",
+      "Terms of use are shown on first launch, and are also in Settings."
+    ]
+  },
+  {
     "version": "1.5.0",
     "date": "2026-11-16",
     "he": [

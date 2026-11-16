@@ -2,7 +2,7 @@
 // stood out; everything else is one tap away rather than on the page.
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { Check, ChevronDown, CircleAlert, CircleCheck, Info, Pencil, TriangleAlert } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ChevronDown, CircleAlert, CircleCheck, Info, Pencil, TriangleAlert } from 'lucide-react';
 import type { SpendBucket, Tx } from '../lib/types';
 import { bucketName, categoryName, emptyMonth, useL, useLang, useStore } from '../lib/store';
 import { dayLabel, isMonthKey, merchantKey, money, monthLabel, pct, statementMonth } from '../lib/format';
@@ -117,6 +117,13 @@ export default function AnalysisPage() {
   const tabTotal = activeTab === 'un' ? a.unclassified.total : a.spent[activeTab];
   const tabColor = activeTab === 'un' ? 'var(--neutral-mark)' : BUCKET_COLOR[activeTab];
   const txsOf = (k: string) => m.txs.filter((t) => merchantKey(t.merchant) === k && inCat(t)).sort((x, y) => y.date.localeCompare(x.date));
+  // What moved most against last month, by category.
+  const prevCats = new Map((prev?.categories ?? []).map((c) => [c.id, c.total]));
+  const changes = !prev ? [] : [...new Set([...a.categories.map((c) => c.id), ...prevCats.keys()])]
+    .filter((id) => { const b = catById.get(id)?.bucket; return b === 'needs' || b === 'wants'; })
+    .map((id) => { const now = a.categories.find((c) => c.id === id)?.total ?? 0, before = prevCats.get(id) ?? 0; return { id, now, before, diff: now - before }; })
+    .filter((c) => Math.abs(c.diff) >= 50)
+    .sort((x, y) => Math.abs(y.diff) - Math.abs(x.diff)).slice(0, 3);
   const openInst = a.installments.filter((i) => i.remaining > 0);
   const standingTotal = a.standing.reduce((s, x) => s + x.amount, 0);
 
@@ -210,7 +217,25 @@ export default function AnalysisPage() {
         </Card>
       )}
 
-      {/* Where it went: bucket → merchants → transactions */}
+      {changes.length > 0 && (
+        <Card>
+          <CardTitle hint={L('הקטגוריות שזזו הכי הרבה', 'The categories that moved the most')}>{L('מה השתנה מהחודש הקודם', 'What changed since last month')}</CardTitle>
+          <ul className="divide-y divide-line">
+            {changes.map((c) => (
+              <li key={c.id} className="flex items-center gap-3 py-2.5">
+                {c.diff > 0 ? <ArrowUp size={18} className="shrink-0 text-bad" /> : <ArrowDown size={18} className="shrink-0 text-good" />}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{categoryName(catById.get(c.id), lang)}</p>
+                  <p className="text-[13px] text-muted"><Money value={c.before} /> {lang === 'he' ? '←' : '→'} <Money value={c.now} /></p>
+                </div>
+                <span className="shrink-0 text-end font-semibold">{c.diff > 0 ? L('עלה ב-', 'Up ') : L('ירד ב-', 'Down ')}<Money value={Math.abs(c.diff)} /></span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
+      {/* Where it went: bucket → category → merchants → transactions */}
       <Card>
         <CardTitle hint={L('לחץ על קטגוריה כדי לראות את בתי העסק, ועל בית עסק כדי לראות עסקאות ולתקן סיווג', 'Tap a category to see its merchants, and a merchant to see its transactions and fix a category')}>{L('לאן הלך הכסף', 'Where the money went')}</CardTitle>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">

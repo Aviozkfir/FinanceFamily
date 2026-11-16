@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { CalendarRange, CloudOff, Home as HomeIcon, Settings as SettingsIcon, TrendingUp } from 'lucide-react';
 import { useL, useStore } from './lib/store';
@@ -6,6 +6,8 @@ import { statementMonth } from './lib/format';
 import { cx } from './components/ui';
 import UpdateBanner from './components/UpdateBanner';
 import WhatsNew from './components/WhatsNew';
+import EulaGate from './components/Eula';
+import { acceptEula, eulaAccepted } from './lib/eula';
 import { startUpdates } from './lib/update';
 import Home from './pages/Home';
 import GoalPage from './pages/Goal';
@@ -24,6 +26,7 @@ export default function App() {
   const monthFilled = useStore((st) => { const m = st.db.months[month]; return !!m && (m.txs.length > 0 || m.manual.length > 0); });
   const L = useL();
   const { pathname } = useLocation();
+  const [agreed, setAgreed] = useState(eulaAccepted);
 
   useEffect(() => { load(); }, [load]);
   // The app is on screen with its data: confirm this version works and look for a newer one.
@@ -36,6 +39,7 @@ export default function App() {
   useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
 
   if (!ready) return <div className="flex h-full items-center justify-center text-muted">…</div>;
+  if (!agreed) return <EulaGate onAccept={() => { acceptEula(); setAgreed(true); }} />;
 
   const nav = [
     { to: '/', icon: HomeIcon, label: L('בית', 'Home'), end: true },

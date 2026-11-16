@@ -12,6 +12,7 @@ public class MainActivity extends BridgeActivity {
         // Must run before the web view picks which content to load.
         AppUpdaterPlugin.rollBackIfUnconfirmed(this);
         registerPlugin(AppUpdaterPlugin.class);
+        registerPlugin(AppFilesPlugin.class);
         super.onCreate(savedInstanceState);
 
         // The phone's back button goes to the previous screen. On the home screen it leaves the
