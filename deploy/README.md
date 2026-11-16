@@ -58,6 +58,21 @@ the version still reach the phones as updates (same name, higher build).
 
 Settings in the app shows the running version, build, commit and date.
 
+## Stable and developer versions
+
+| Branch pushed | Release it lands in | Who gets it |
+|---|---|---|
+| `main` | **Latest APK** (`latest-apk`) | Every phone |
+| any other branch | **Developer build** (`dev-apk`) | Phones with Settings → "Receive developer versions" switched on |
+
+Work happens on a branch; each push there is built and reaches the phones that opted in. When a
+change is approved it is merged into `main`, and that push is what everyone else receives.
+
+A phone on developer versions takes whichever release is newer, so it also gets a stable release
+that overtakes the last developer build. Switching the option off offers the stable version again,
+even though it is older. Before any update the app keeps one copy of the data, which Settings can
+restore — developer versions run on the real data.
+
 ## Updates on the phone
 
 On start and whenever it comes back to the front, the app reads the notes of the **Latest APK**

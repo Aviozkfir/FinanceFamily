@@ -11,8 +11,11 @@ import { useSyncExternalStore } from 'react';
 import { registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 import { isNative } from './platform';
 
+export type Channel = 'stable' | 'dev';
 export interface AppVersion {
   version: string; build: number; native: number; commit: string; date: string;
+  /** 'stable' = built from main; 'dev' = a developer build of another branch. Absent on old builds = stable. */
+  channel?: Channel;
   /** What changed in this version; present on a published version read from GitHub. */
   notes?: { he: string[]; en: string[] } | null;
 }
@@ -21,7 +24,20 @@ declare const __APP_VERSION__: AppVersion;
 export const CURRENT: AppVersion = __APP_VERSION__;
 
 const REPO = 'Aviozkfir/FinanceFamily';
-const RELEASE_TAG = 'latest-apk';
+const RELEASE_TAGS: Record<Channel, string> = { stable: 'latest-apk', dev: 'dev-apk' };
+const CHANNEL_STORAGE = 'finance-update-channel';
+/** Copy of the data taken right before an update, so a bad version cannot cost the user their months. */
+const SNAPSHOT_STORAGE = 'finance-db-before-update';
+const DB_STORAGE = 'finance-db';
+
+export const currentChannel = (): Channel => CURRENT.channel ?? 'stable';
+/** The channel this phone follows: what the user chose, or else the channel of the build it is running. */
+export function getChannel(): Channel {
+  try {
+    const chosen = localStorage.getItem(CHANNEL_STORAGE);
+    return chosen === 'dev' || chosen === 'stable' ? chosen : currentChannel();
+  } catch { return currentChannel(); }
+}
 const RECHECK_MS = 10 * 60 * 1000;
 
 interface Updater {
@@ -46,9 +62,13 @@ export interface UpdateState {
   /** A build that was installed, failed to start and was undone. It is not offered again by itself. */
   rolledBackBuild?: number;
   checkedAt?: number;
+  /** The channel this phone follows (stable unless developer versions are on). */
+  channel: Channel;
+  /** True when the offered version is older than the running one: leaving a developer build for stable. */
+  goingBack?: boolean;
 }
 
-let state: UpdateState = { phase: 'idle' };
+let state: UpdateState = { phase: 'idle', channel: getChannel() };
 let assets: { bundle?: string; apk?: string } = {};
 const subscribers = new Set<() => void>();
 function set(patch: Partial<UpdateState>) {
@@ -67,40 +87,83 @@ export function readManifest(notes: string): AppVersion | null {
   } catch { return null; }
 }
 
-/** Asks GitHub for the published version. `manual` also re-offers a build that was rolled back. */
+type Published = { version: AppVersion; bundle?: string; apk?: string };
+/** Reads one channel's release. Returns null when that release does not exist (yet). */
+async function readRelease(channel: Channel): Promise<Published | null | 'not-public' | 'busy'> {
+  const res = await fetch(`https://api.github.com/repos/${REPO}/releases/tags/${RELEASE_TAGS[channel]}`, {
+    headers: { Accept: 'application/vnd.github+json' },
+    cache: 'no-store',
+  });
+  if (res.status === 404) return channel === 'stable' ? 'not-public' : null;
+  if (res.status === 403 || res.status === 429) return 'busy';
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const release = (await res.json()) as { body?: string; assets?: { name: string; url: string }[] };
+  const version = readManifest(release.body ?? '');
+  if (!version) return null;
+  const find = (name: string) => release.assets?.find((a) => a.name === name)?.url;
+  return { version: { ...version, channel }, bundle: find('bundle.zip'), apk: find('FinanceFamily.apk') };
+}
+
+/** Switches between stable and developer versions, then looks for what that means right now. */
+export function setChannel(channel: Channel) {
+  try { localStorage.setItem(CHANNEL_STORAGE, channel); } catch { /* storage unavailable */ }
+  set({ channel, phase: 'idle', latest: undefined, kind: undefined, goingBack: undefined, error: undefined, detail: undefined, checkedAt: undefined });
+  void checkForUpdate(true);
+}
+
+/**
+ * Asks GitHub for the published version. `manual` also re-offers a build that was rolled back.
+ *
+ * On the stable channel the app follows the Latest APK release. If it is still running a
+ * developer build (the user just switched developer versions off), stable is offered even though
+ * it is older. On the developer channel the app takes whichever of the two releases is newer, so
+ * it also receives a stable release that overtakes the last developer build.
+ */
 export async function checkForUpdate(manual = false): Promise<void> {
   if (!isNative() || state.phase === 'checking' || state.phase === 'downloading' || state.phase === 'installing' || state.phase === 'restarting') return;
   if (!manual && state.checkedAt && Date.now() - state.checkedAt < RECHECK_MS) return;
-  set({ phase: 'checking', error: undefined, detail: undefined });
+  const channel = getChannel();
+  set({ phase: 'checking', channel, error: undefined, detail: undefined });
   try {
-    const [info, res] = await Promise.all([
-      Updater.getInfo(),
-      fetch(`https://api.github.com/repos/${REPO}/releases/tags/${RELEASE_TAG}`, {
-        headers: { Accept: 'application/vnd.github+json' },
-        cache: 'no-store',
-      }),
-    ]);
-    if (res.status === 404) { set({ phase: 'idle', error: 'not-public', checkedAt: Date.now() }); return; }
-    if (res.status === 403 || res.status === 429) { set({ phase: 'idle', error: 'busy', checkedAt: Date.now() }); return; }
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const release = (await res.json()) as { body?: string; assets?: { name: string; url: string }[] };
-    const latest = readManifest(release.body ?? '');
-    const find = (name: string) => release.assets?.find((a) => a.name === name)?.url;
-    assets = { bundle: find('bundle.zip'), apk: find('FinanceFamily.apk') };
+    const [info, stable, dev] = await Promise.all([Updater.getInfo(), readRelease('stable'), channel === 'dev' ? readRelease('dev') : null]);
+    const problem = [stable, dev].find((r): r is 'not-public' | 'busy' => typeof r === 'string');
+    if (problem) { set({ phase: 'idle', error: problem, checkedAt: Date.now() }); return; }
+    const found = [stable, dev].filter((r): r is Published => !!r && typeof r !== 'string').sort((x, y) => y.version.build - x.version.build)[0];
     const rolledBackBuild = info.rolledBackBuild || undefined;
-    const kind = latest && latest.native > info.native ? 'apk' : 'bundle';
-    const offer = latest != null && latest.build > CURRENT.build && Boolean(kind === 'apk' ? assets.apk : assets.bundle)
+    if (!found) { set({ phase: 'idle', latest: undefined, kind: undefined, rolledBackBuild, checkedAt: Date.now() }); return; }
+    const latest = found.version;
+    const goingBack = channel === 'stable' && currentChannel() === 'dev' && latest.build < CURRENT.build;
+    const kind = latest.native > info.native ? 'apk' : 'bundle';
+    const offer = (latest.build > CURRENT.build || goingBack) && Boolean(kind === 'apk' ? found.apk : found.bundle)
       && (manual || latest.build !== rolledBackBuild);
-    set({ phase: offer ? 'available' : 'idle', latest: latest ?? undefined, kind: offer ? kind : undefined, rolledBackBuild, checkedAt: Date.now() });
+    assets = { bundle: found.bundle, apk: found.apk };
+    set({ phase: offer ? 'available' : 'idle', latest, kind: offer ? kind : undefined, goingBack: offer ? goingBack : undefined, rolledBackBuild, checkedAt: Date.now() });
   } catch (e) {
     set({ phase: 'idle', error: navigator.onLine === false ? 'offline' : 'failed', detail: e instanceof Error ? e.message : String(e) });
   }
+}
+
+/** When the data was last copied aside before an update, or null. */
+export function snapshotDate(): string | null {
+  try { return (JSON.parse(localStorage.getItem(SNAPSHOT_STORAGE) ?? 'null') as { at?: string } | null)?.at ?? null; } catch { return null; }
+}
+/** The data as it was before the last update, for the store to load back. */
+export function readSnapshot(): unknown {
+  try { return (JSON.parse(localStorage.getItem(SNAPSHOT_STORAGE) ?? 'null') as { db?: unknown } | null)?.db ?? null; } catch { return null; }
+}
+function takeSnapshot() {
+  try {
+    const db = localStorage.getItem(DB_STORAGE);
+    if (db) localStorage.setItem(SNAPSHOT_STORAGE, `{"at":${JSON.stringify(new Date().toISOString())},"from":${JSON.stringify(CURRENT.version)},"db":${db}}`);
+  } catch { /* out of space: the update still goes ahead */ }
 }
 
 /** Downloads and applies the offered update. A content update ends with the app reloading itself. */
 export async function installUpdate(): Promise<void> {
   if (state.phase !== 'available' || !state.latest) return;
   const { latest, kind } = state;
+  // Keep the data as it was on the last stable version: that is the state worth going back to.
+  if (currentChannel() === 'stable') takeSnapshot();
   set({ phase: 'downloading', percent: 0, error: undefined, detail: undefined });
   const listener = await Updater.addListener('progress', (p) => set({ percent: p.percent }));
   try {

@@ -1,4 +1,8 @@
-# Builds the Android app on every push to main and publishes it in the "Latest APK" release:
+# Builds the Android app on every push and publishes it in a release:
+#   main          -> "Latest APK" (tag latest-apk): the stable channel every phone follows
+#   other branch  -> "Developer build" (tag dev-apk): only phones with developer versions
+#                    switched on in Settings follow it
+# Each release holds:
 #   FinanceFamily.apk  the full app, for a first install or when the Android wrapper changed
 #   bundle.zip         only the web content, which installed apps download to update themselves
 # The release notes carry the version of the build; installed apps read it to know an update exists.
@@ -7,14 +11,19 @@ name: Android APK
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
   workflow_dispatch:
 
 permissions:
   contents: write
 
+env:
+  APP_CHANNEL: ${{ github.ref == 'refs/heads/main' && 'stable' || 'dev' }}
+  RELEASE_TAG: ${{ github.ref == 'refs/heads/main' && 'latest-apk' || 'dev-apk' }}
+  RELEASE_TITLE: ${{ github.ref == 'refs/heads/main' && 'Latest APK' || 'Developer build' }}
+
 concurrency:
-  group: android-apk
+  group: android-apk-${{ github.ref == 'refs/heads/main' && 'stable' || 'dev' }}
   cancel-in-progress: true
 
 jobs:
@@ -69,7 +78,7 @@ jobs:
             FinanceFamily.apk
             bundle.zip
 
-      - name: Publish as the "Latest APK" release
+      - name: Publish the release of this channel
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.version }}
@@ -77,17 +86,17 @@ jobs:
           MANIFEST: ${{ steps.version.outputs.json }}
         run: |
           # The comment line is what installed apps read (src/lib/update.ts); keep its format.
-          notes="Version $VERSION, build $BUILD, from commit ${GITHUB_SHA::7} on $(date -u +'%Y-%m-%d %H:%M UTC'). Download FinanceFamily.apk below and open it on the phone. Installed apps update themselves from bundle.zip.
+          notes="$RELEASE_TITLE ($APP_CHANNEL channel). Version $VERSION, build $BUILD, from commit ${GITHUB_SHA::7} on $(date -u +'%Y-%m-%d %H:%M UTC'). Download FinanceFamily.apk below and open it on the phone. Installed apps update themselves from bundle.zip.
 
           $(node deploy/scripts/version.mjs --notes)
 
           <!-- update-manifest $MANIFEST -->"
-          if gh release view latest-apk > /dev/null 2>&1; then
+          if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
             # Files first, notes last: an app must not learn about a build before its files are there.
-            gh release upload latest-apk FinanceFamily.apk bundle.zip --clobber
-            gh release edit latest-apk --notes "$notes"
+            gh release upload "$RELEASE_TAG" FinanceFamily.apk bundle.zip --clobber
+            gh release edit "$RELEASE_TAG" --notes "$notes"
           else
-            gh release create latest-apk FinanceFamily.apk bundle.zip --title "Latest APK" --notes "$notes" --prerelease
+            gh release create "$RELEASE_TAG" FinanceFamily.apk bundle.zip --target "$GITHUB_SHA" --title "$RELEASE_TITLE" --notes "$notes" --prerelease
           fi
 
       - name: Keep a permanent release for a new version number

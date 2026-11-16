@@ -5,7 +5,7 @@ import { SPEND_BUCKETS } from '../lib/types';
 import { bucketName, useL, useLang, useStore } from '../lib/store';
 import { isNative } from '../lib/platform';
 import { buildModel } from '../lib/learn';
-import { CURRENT, checkForUpdate, installUpdate, useUpdate } from '../lib/update';
+import { CURRENT, checkForUpdate, currentChannel, installUpdate, readSnapshot, setChannel, snapshotDate, useUpdate } from '../lib/update';
 import { CHANGELOG, linesOf } from '../lib/changelog';
 import { BUCKET_COLOR, Button, Card, CardTitle, Dot, IconButton, PageHeader, Pill, Segmented, TextInput, cx } from '../components/ui';
 
@@ -18,12 +18,19 @@ export default function SettingsPage() {
   const [split, setSplit] = useState<Split>(s.split);
   const [importMsg, setImportMsg] = useState('');
   const importRef = useRef<HTMLInputElement>(null);
+  const native = isNative();
   const update = useUpdate();
+  const [confirmRestore, setConfirmRestore] = useState(false);
+  const snapshot = native ? snapshotDate() : null;
+  function restoreSnapshot() {
+    const data = readSnapshot() as DB | null;
+    if (data && typeof data.months === 'object') { replaceDb(data); setImportMsg(L('הנתונים שוחזרו.', 'Data restored.')); }
+    setConfirmRestore(false);
+  }
 
   const splitSum = split.needs + split.wants + split.invest;
   useEffect(() => { if (splitSum === 100) setSettings({ split }); }, [split]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const native = isNative();
   function exportData() {
     const url = URL.createObjectURL(new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' }));
     const a = document.createElement('a');
@@ -95,7 +102,7 @@ export default function SettingsPage() {
       <Card>
         <CardTitle hint={native ? L('כשמתפרסמת גרסה חדשה מופיע כפתור עדכון בראש המסך', 'When a new version is published, an Update button appears at the top of the screen') : undefined}>{L('גרסה ועדכונים', 'Version and updates')}</CardTitle>
         <p className="text-sm">
-          <span className="font-semibold">{L('גרסה', 'Version')} <bdi dir="ltr">{CURRENT.version}</bdi></span>
+          <span className="font-semibold">{L('גרסה', 'Version')} <bdi dir="ltr">{CURRENT.version}</bdi>{native && currentChannel() === 'dev' && <> · {L('גרסת פיתוח', 'developer build')}</>}</span>
           {CURRENT.build > 0 && <span className="text-muted"> · <bdi dir="ltr">{L('בנייה', 'build')} {CURRENT.build} · {CURRENT.commit} · {CURRENT.date.slice(0, 10)}</bdi></span>}
         </p>
         <details className="mt-3 text-sm">
@@ -113,7 +120,7 @@ export default function SettingsPage() {
           <>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <Button size="sm" icon={<RefreshCw size={15} className={update.phase === 'checking' ? 'animate-spin' : ''} />} disabled={update.phase !== 'idle' && update.phase !== 'available'} onClick={() => void checkForUpdate(true)}>{L('בדוק עדכונים', 'Check for updates')}</Button>
-              {update.phase === 'available' && update.latest && <Button size="sm" variant="primary" icon={<Download size={15} />} onClick={() => void installUpdate()}>{L(`עדכן ל-${update.latest.version}`, `Update to ${update.latest.version}`)}</Button>}
+              {update.phase === 'available' && update.latest && <Button size="sm" variant="primary" icon={<Download size={15} />} onClick={() => void installUpdate()}>{update.goingBack ? L(`חזור ל-${update.latest.version}`, `Go back to ${update.latest.version}`) : L(`עדכן ל-${update.latest.version}`, `Update to ${update.latest.version}`)}</Button>}
               {update.phase === 'downloading' && <Pill tone="accent">{L('מוריד…', 'Downloading…')} {update.percent ?? 0}%</Pill>}
               {update.phase === 'idle' && !update.error && update.checkedAt && <Pill tone="good">● {L('האפליקציה מעודכנת', 'The app is up to date')}</Pill>}
             </div>
@@ -127,6 +134,23 @@ export default function SettingsPage() {
             )}
             {update.rolledBackBuild != null && update.rolledBackBuild > CURRENT.build && (
               <p className="mt-2 text-sm text-warn">{L(`בנייה ${update.rolledBackBuild} הותקנה אך לא עלתה, והאפליקציה חזרה לגרסה הקודמת. היא לא תוצע שוב אוטומטית.`, `Build ${update.rolledBackBuild} was installed but did not start, so the app went back to the previous version. It will not be offered again automatically.`)}</p>
+            )}
+            <div className="mt-4 rounded-2xl bg-surface2 p-4">
+              <label className="flex cursor-pointer items-start gap-3">
+                <input type="checkbox" checked={update.channel === 'dev'} onChange={(e) => setChannel(e.target.checked ? 'dev' : 'stable')} className="mt-1 h-4 w-4 accent-[var(--accent)]" />
+                <span>
+                  <span className="block text-sm font-semibold">{L('קבל גרסאות פיתוח', 'Receive developer versions')}</span>
+                  <span className="block text-[13px] text-muted">{L('גרסאות שעדיין בבדיקה, לפני שהן מגיעות לכולם. הן עובדות על הנתונים האמיתיים שלך. כיבוי מחזיר לגרסה היציבה.', 'Versions still being tested, before they reach everyone. They run on your real data. Switching this off takes you back to the stable version.')}</span>
+                </span>
+              </label>
+            </div>
+            {snapshot && (
+              <div className="mt-3 flex flex-wrap items-center gap-2 text-[13px] text-muted">
+                <span>{L(`נשמר עותק של הנתונים מלפני העדכון האחרון מגרסה יציבה (${snapshot.slice(0, 10)}).`, `A copy of your data was kept from before the last update off a stable version (${snapshot.slice(0, 10)}).`)}</span>
+                {confirmRestore
+                  ? <><Button size="sm" variant="danger" onClick={restoreSnapshot}>{L('כן, החזר את הנתונים למצב הזה', 'Yes, put my data back to that')}</Button><Button size="sm" variant="ghost" onClick={() => setConfirmRestore(false)}>{L('ביטול', 'Cancel')}</Button></>
+                  : <Button size="sm" variant="ghost" onClick={() => setConfirmRestore(true)}>{L('שחזר את העותק', 'Restore that copy')}</Button>}
+              </div>
             )}
           </>
         )}
