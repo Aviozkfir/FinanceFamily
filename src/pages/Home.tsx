@@ -1,11 +1,11 @@
+// Home: the one thing to do next, and how the last month went. Nothing else.
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, CalendarSearch, Check, Target } from 'lucide-react';
-import { bucketName, sumItems, useL, useLang, useStore } from '../lib/store';
-import { currentMonth, monthLabel, pct, shiftMonth } from '../lib/format';
-import { SPEND_BUCKETS } from '../lib/types';
+import { ArrowLeft, ArrowRight, CalendarPlus, CircleCheck, ListChecks, Target } from 'lucide-react';
+import { useL, useLang, useStore } from '../lib/store';
+import { currentMonth, money, monthLabel, pct, shiftMonth } from '../lib/format';
 import { analyzeMonth, filledMonths } from '../lib/analysis/compute';
-import { BUCKET_COLOR, Card, CardTitle, Dot, Money, Pill, cx } from '../components/ui';
-import { BucketMeters, Donut } from '../components/charts';
+import { Card, CardTitle, Money, cx } from '../components/ui';
+import { MonthPicture } from '../components/charts';
 
 export default function Home() {
   const L = useL();
@@ -15,91 +15,74 @@ export default function Home() {
   const next = shiftMonth(now, 1), prev = shiftMonth(now, -1);
   const Arrow = lang === 'he' ? ArrowLeft : ArrowRight;
 
-  const nextGoal = db.months[next]?.goal;
-  const prevMonth = db.months[prev];
-  const prevFilled = !!prevMonth && (prevMonth.txs.length > 0 || prevMonth.manual.length > 0);
-  const filled = filledMonths(db);
-  const latestKey = [...filled].reverse().find((k) => db.months[k].txs.length || db.months[k].manual.length);
+  const has = (k: string) => { const m = db.months[k]; return !!m && (m.txs.length > 0 || m.manual.length > 0); };
+  const latestKey = [...filledMonths(db)].reverse().find(has);
   const latest = latestKey ? analyzeMonth(db.months[latestKey], db) : null;
+  const toReview = latest ? latest.unclassified.count + latest.guessed.count : 0;
 
-  const hour = new Date().getHours();
-  const greeting = hour < 5 ? L('לילה טוב', 'Good night') : hour < 12 ? L('בוקר טוב', 'Good morning') : hour < 18 ? L('צהריים טובים', 'Good afternoon') : L('ערב טוב', 'Good evening');
+  // The single next step, most useful first.
+  const step =
+    latest && toReview > 0 ? {
+      icon: ListChecks, to: `/month/${latest.key}/classify`, cta: L('לסיווג', 'Review'),
+      title: L(`${toReview} עסקאות מחכות לך ב${monthLabel(latest.key, lang)}`, `${toReview} transactions are waiting in ${monthLabel(latest.key, lang)}`),
+      body: L(`${money(latest.unclassified.total + latest.guessed.total, lang)} עדיין לא סווגו או לא אושרו, אז המספרים של החודש לא סופיים.`, `${money(latest.unclassified.total + latest.guessed.total, lang)} is not classified or confirmed yet, so the month's numbers are not final.`),
+    } : !has(prev) ? {
+      icon: CalendarPlus, to: `/month/${prev}`, cta: L('התחל', 'Start'),
+      title: L(`הגיע הזמן לסכם את ${monthLabel(prev, lang)}`, `Time to wrap up ${monthLabel(prev, lang)}`),
+      body: L('מעלים את דף החיוב של האשראי, מאשרים את הסיווג ומקבלים את התמונה של החודש.', 'Upload the card statement, confirm the classification and get the picture of the month.'),
+    } : !db.months[next]?.goal ? {
+      icon: Target, to: `/goal/${next}`, cta: L('הגדר יעד', 'Set a goal'),
+      title: L(`יעד ל${monthLabel(next, lang)}`, `A goal for ${monthLabel(next, lang)}`),
+      body: L('כמה צפוי להיכנס, וכמה מזה הולך לצרכים, לרצונות ולחיסכון.', 'What you expect to earn, and how much of it goes to needs, wants and savings.'),
+    } : null;
 
-  const quick = [
-    {
-      to: `/goal/${next}`, icon: Target, color: 'var(--accent)',
-      title: L('הגדרת יעד לחודש הבא', 'Set a goal for next month'),
-      sub: monthLabel(next, lang),
-      body: nextGoal
-        ? L(`יעד מוגדר: הכנסה צפויה ${'⁦'}₪${sumItems(nextGoal.incomes).toLocaleString()}${'⁩'}`, `Goal set: expected income ₪${sumItems(nextGoal.incomes).toLocaleString()}`)
-        : L('הזן הכנסה צפויה וקבל חלוקה ל-50/30/20', 'Enter expected income and get a 50/30/20 split'),
-      done: !!nextGoal,
-    },
-    {
-      to: prevFilled ? `/month/${prev}/analysis` : `/month/${prev}`, icon: CalendarSearch, color: 'var(--needs)',
-      title: L('ניתוח החודש הקודם', 'Analyze last month'),
-      sub: monthLabel(prev, lang),
-      body: prevFilled
-        ? L(`${prevMonth!.txs.length} עסקאות נטענו — לצפייה בניתוח`, `${prevMonth!.txs.length} transactions loaded — view the analysis`)
-        : L('הכנסות, פירוט אשראי, סיווג — וניתוח מלא', 'Income, card statement, classification — and a full analysis'),
-      done: prevFilled,
-    },
-  ];
+  const others = [
+    !db.months[next]?.goal && step?.icon !== Target ? { to: `/goal/${next}`, label: L(`הגדר יעד ל${monthLabel(next, lang)}`, `Set a goal for ${monthLabel(next, lang)}`) } : null,
+    { to: `/month/${now}`, label: L(`מילוי ${monthLabel(now, lang)}`, `Fill in ${monthLabel(now, lang)}`) },
+  ].filter((x): x is { to: string; label: string } => !!x);
 
   return (
-    <div className="rise space-y-6">
-      <header>
-        <p className="text-sm text-muted">{new Intl.DateTimeFormat(lang === 'he' ? 'he-IL' : 'en-IL', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())}</p>
-        <h1 className="mt-1 text-3xl font-bold tracking-tight sm:text-4xl">{greeting} 👋</h1>
-      </header>
-
-      <div className="grid gap-4 sm:grid-cols-2">
-        {quick.map((q) => (
-          <Link key={q.to} to={q.to} className="group relative overflow-hidden rounded-3xl border border-line bg-surface p-6 shadow-[var(--shadow)] transition-colors hover:border-line-strong">
-            <div aria-hidden className="pointer-events-none absolute -end-10 -top-10 h-40 w-40 rounded-full opacity-[0.13] blur-2xl" style={{ background: q.color }} />
-            <div className="flex items-start justify-between">
-              <span className="flex h-12 w-12 items-center justify-center rounded-2xl" style={{ background: `color-mix(in oklab, ${q.color} 18%, transparent)`, color: q.color }}>
-                <q.icon size={24} />
-              </span>
-              {q.done ? <Pill tone="good"><Check size={12} />{L('מולא', 'Filled')}</Pill> : <Pill>{q.sub}</Pill>}
-            </div>
-            <h2 className="mt-5 text-xl font-bold">{q.title}</h2>
-            <p className="mt-1 text-sm text-ink2">{q.done && <span className="text-muted">{q.sub} · </span>}{q.body}</p>
-            <span className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-ink">
-              {L('התחל', 'Start')}<Arrow size={16} className="transition-transform group-hover:-translate-x-1 ltr:group-hover:translate-x-1" />
-            </span>
-          </Link>
-        ))}
-      </div>
+    <div className="rise space-y-4">
+      {step ? (
+        <Link to={step.to} className="group relative block overflow-hidden rounded-3xl border border-line bg-surface p-6 shadow-[var(--shadow)] transition-colors hover:border-line-strong">
+          <div aria-hidden className="pointer-events-none absolute -end-10 -top-10 h-40 w-40 rounded-full bg-accent opacity-[0.13] blur-2xl" />
+          <p className="flex items-center gap-2 text-[13px] font-medium text-accent"><step.icon size={16} />{L('הצעד הבא', 'Next step')}</p>
+          <h1 className="mt-2 text-2xl font-bold leading-tight tracking-tight">{step.title}</h1>
+          <p className="mt-1.5 text-sm text-ink2">{step.body}</p>
+          <span className="mt-4 inline-flex h-10 items-center gap-2 rounded-xl bg-ink px-4 text-sm font-medium text-page">{step.cta}<Arrow size={16} /></span>
+        </Link>
+      ) : (
+        <div className="flex items-center gap-3 rounded-3xl border border-line bg-surface p-6 shadow-[var(--shadow)]">
+          <CircleCheck size={28} className="shrink-0 text-good" />
+          <div><h1 className="text-xl font-bold">{L('הכול מעודכן', 'Everything is up to date')}</h1>
+            <p className="text-sm text-ink2">{L('החודש האחרון סוכם ויש יעד לחודש הבא.', 'The last month is wrapped up and next month has a goal.')}</p></div>
+        </div>
+      )}
 
       {latest ? (
-        <div className="grid gap-4 lg:grid-cols-5">
-          <Card className="lg:col-span-3">
-            <CardTitle hint={latest.basis === 'goal' ? L('מול היעד שהגדרת מראש', 'Against the goal you set') : L('מול חלוקת 50/30/20 של ההכנסה', 'Against a 50/30/20 split of income')}
-              action={<Link to={`/month/${latest.key}/analysis`} className="text-sm font-medium text-accent hover:underline">{L('לניתוח המלא', 'Full analysis')}</Link>}>
-              {L('החודש האחרון שמולא', 'Latest filled month')} · {monthLabel(latest.key, lang)}
-            </CardTitle>
-            <BucketMeters a={latest} />
-          </Card>
-          <Card className="flex flex-col items-center justify-center gap-4 lg:col-span-2">
-            <Donut size={190}
-              slices={(['needs', 'wants'] as const).map((b) => ({ id: b, label: bucketName(b, lang), value: latest.spent[b], color: BUCKET_COLOR[b] }))}
-              center={<><span className="text-xs text-muted">{L('סך הוצאות', 'Total spent')}</span><Money value={latest.totalSpent} className="text-2xl font-bold" /></>} />
-            <div className="grid w-full grid-cols-2 gap-3 text-center">
-              <div className="rounded-xl bg-surface2 p-3"><p className="text-xs text-muted">{L('הכנסה', 'Income')}</p><Money value={latest.income} className="font-semibold" /></div>
-              <div className="rounded-xl bg-surface2 p-3"><p className="text-xs text-muted">{L('שיעור חיסכון', 'Savings rate')}</p>
-                <span className={cx('font-semibold', latest.savingsRate != null && latest.savingsRate < 0.1 && 'text-warn')}>{latest.savingsRate == null ? '—' : pct(latest.savingsRate)}</span></div>
-            </div>
-          </Card>
-        </div>
+        <Card>
+          <CardTitle action={<Link to={`/month/${latest.key}/analysis`} className="shrink-0 text-sm font-medium text-accent hover:underline">{L('לניתוח המלא', 'Full analysis')}</Link>}>
+            {monthLabel(latest.key, lang)}
+          </CardTitle>
+          {latest.income > 0 ? (
+            <p className="mb-4 flex flex-wrap items-baseline gap-x-3">
+              <span className="text-sm text-ink2">{latest.leftover >= 0 ? L('חסכת', 'You saved') : L('חרגת ב-', 'You overspent by')}</span>
+              <Money value={Math.abs(latest.leftover)} className={cx('text-3xl font-bold tracking-tight', latest.leftover < 0 && 'text-bad')} />
+              {latest.leftover >= 0 && <span className="text-sm text-ink2">{pct(latest.savingsRate ?? 0)} {L('מההכנסה', 'of income')}</span>}
+            </p>
+          ) : (
+            <p className="mb-4 flex flex-wrap items-baseline gap-x-3"><span className="text-sm text-ink2">{L('הוצאת', 'You spent')}</span><Money value={latest.totalSpent} className="text-3xl font-bold tracking-tight" /></p>
+          )}
+          <MonthPicture a={latest} legend />
+        </Card>
       ) : (
         <Card>
           <CardTitle>{L('איך זה עובד', 'How it works')}</CardTitle>
-          <ol className="grid gap-4 sm:grid-cols-3">
+          <ol className="grid gap-3 sm:grid-cols-3">
             {[
-              [L('מגדירים יעד', 'Set a goal'), L('הכנסה צפויה לחודש הבא, מחולקת ל-50% צרכים, 30% רצונות ו-20% חיסכון.', 'Expected income for next month, split 50% needs, 30% wants, 20% savings.')],
-              [L('ממלאים את החודש', 'Fill in the month'), L('מעלים את קובצי האשראי, גוררים כל עסקה לקטגוריה ומוסיפים הכנסות והוצאות נוספות.', 'Upload card statements, drag each transaction into a category, add other income and expenses.')],
-              [L('מקבלים ניתוח', 'Get the analysis'), L('רואים איפה עמדת ביעד, איפה חרגת, ושואלים את Claude מה אפשר לשפר.', 'See where you met the goal, where you went over, and ask Claude what to improve.')],
+              [L('מעלים דף חיוב', 'Upload a statement'), L('קובץ Excel או CSV מאתר חברת האשראי.', 'An Excel or CSV file from your card issuer.')],
+              [L('מאשרים את הסיווג', 'Confirm the classification'), L('האפליקציה לומדת ממך מה צורך ומה רצון, וכל חודש נשאר לך פחות לעשות.', 'The app learns from you what is a need and what is a want, so each month leaves you less to do.')],
+              [L('רואים את התמונה', 'See the picture'), L('כמה חסכת, לאן הלך הכסף, ומה בלט החודש.', 'How much you saved, where the money went, and what stood out.')],
             ].map(([t, d], i) => (
               <li key={i} className="rounded-2xl bg-surface2 p-4">
                 <span className="mb-2 flex h-7 w-7 items-center justify-center rounded-full bg-ink text-sm font-bold text-page">{i + 1}</span>
@@ -110,39 +93,9 @@ export default function Home() {
         </Card>
       )}
 
-      <section>
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="font-semibold">{L('חודשים אחרונים', 'Recent months')}</h2>
-          <Link to="/history" className="text-sm font-medium text-accent hover:underline">{L('כל ההיסטוריה', 'All history')}</Link>
-        </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {[1, 0, -1, -2].map((off) => {
-            const key = shiftMonth(now, off);
-            const m = db.months[key];
-            const has = !!m && (m.txs.length > 0 || m.manual.length > 0);
-            const a = has ? analyzeMonth(m!, db) : null;
-            return (
-              <Link key={key} to={has ? `/month/${key}/analysis` : off > 0 ? `/goal/${key}` : `/month/${key}`}
-                className="rounded-2xl border border-line bg-surface p-4 transition-colors hover:border-line-strong">
-                <p className="text-sm font-semibold">{monthLabel(key, lang)}</p>
-                {a ? (
-                  <>
-                    <Money value={a.totalSpent} className="mt-2 block text-lg font-bold" />
-                    <div className="mt-2 flex h-1.5 gap-0.5 overflow-hidden rounded-full">
-                      {SPEND_BUCKETS.map((b) => a.spent[b] > 0 && <span key={b} style={{ flex: a.spent[b], background: BUCKET_COLOR[b] }} />)}
-                      {a.unclassified.total > 0 && <span style={{ flex: a.unclassified.total, background: 'var(--neutral-mark)' }} />}
-                    </div>
-                  </>
-                ) : (
-                  <p className="mt-2 flex items-center gap-1.5 text-sm text-muted">
-                    {m?.goal ? <><Dot color="var(--accent)" />{L('יעד הוגדר', 'Goal set')}</> : off > 0 ? L('הגדר יעד', 'Set a goal') : L('טרם מולא', 'Not filled yet')}
-                  </p>
-                )}
-              </Link>
-            );
-          })}
-        </div>
-      </section>
+      <div className="flex flex-wrap gap-x-5 gap-y-2 px-1 text-sm">
+        {others.map((o) => <Link key={o.to} to={o.to} className="font-medium text-accent hover:underline">{o.label}</Link>)}
+      </div>
     </div>
   );
 }

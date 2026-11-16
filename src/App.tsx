@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { CalendarRange, CloudOff, History as HistoryIcon, Home as HomeIcon, Languages, Moon, Settings as SettingsIcon, Sun, Target, TrendingUp } from 'lucide-react';
+import { CalendarRange, CloudOff, Home as HomeIcon, Languages, Moon, Settings as SettingsIcon, Sun, TrendingUp } from 'lucide-react';
 import { useL, useStore } from './lib/store';
 import { currentMonth, shiftMonth } from './lib/format';
 import { cx } from './components/ui';
@@ -20,6 +20,7 @@ export default function App() {
   const { ready, load, offline } = useStore();
   const { lang, theme } = useStore((s) => s.db.settings);
   const setSettings = useStore((s) => s.setSettings);
+  const lastMonthFilled = useStore((st) => { const m = st.db.months[shiftMonth(currentMonth(), -1)]; return !!m && (m.txs.length > 0 || m.manual.length > 0); });
   const L = useL();
   const { pathname } = useLocation();
 
@@ -38,14 +39,18 @@ export default function App() {
   const now = currentMonth();
   const nav = [
     { to: '/', icon: HomeIcon, label: L('בית', 'Home'), end: true },
-    { to: `/goal/${shiftMonth(now, 1)}`, match: '/goal', icon: Target, label: L('יעדים', 'Goals') },
-    { to: `/month/${shiftMonth(now, -1)}`, match: '/month', icon: CalendarRange, label: L('ניתוח חודש', 'Month') },
-    { to: '/history', icon: HistoryIcon, label: L('היסטוריה', 'History') },
-    { to: '/trends', icon: TrendingUp, label: L('מגמות ותחזית', 'Trends') },
-    { to: '/settings', icon: SettingsIcon, label: L('הגדרות', 'Settings') },
+    // Straight to the picture when last month is filled in, otherwise to filling it in.
+    { to: lastMonthFilled ? `/month/${shiftMonth(now, -1)}/analysis` : `/month/${shiftMonth(now, -1)}`, match: ['/month', '/goal'], icon: CalendarRange, label: L('חודש', 'Month') },
+    { to: '/history', match: ['/history', '/trends'], icon: TrendingUp, label: L('לאורך זמן', 'Over time') },
   ];
   const fullscreen = pathname.endsWith('/classify');
-  const active = (n: (typeof nav)[number]) => (n.match ? pathname.startsWith(n.match) : n.end ? pathname === '/' : pathname.startsWith(n.to));
+  const active = (n: (typeof nav)[number]) => (n.match ? n.match.some((p) => pathname.startsWith(p)) : pathname === '/');
+  const settingsLink = (
+    <NavLink to="/settings" aria-label={L('הגדרות', 'Settings')} title={L('הגדרות', 'Settings')}
+      className={({ isActive }) => cx('flex h-9 w-9 items-center justify-center rounded-xl hover:bg-surface2 hover:text-ink', isActive ? 'bg-surface2 text-accent' : 'text-ink2')}>
+      <SettingsIcon size={17} />
+    </NavLink>
+  );
 
   const toggles = (
     <>
@@ -76,7 +81,7 @@ export default function App() {
               </NavLink>
             ))}
           </nav>
-          <div className="flex items-center justify-between border-t border-line pt-3">{toggles}</div>
+          <div className="flex items-center justify-between border-t border-line pt-3">{toggles}{settingsLink}</div>
         </aside>
       )}
 
@@ -84,7 +89,7 @@ export default function App() {
         {!fullscreen && (
           <div className="flex items-center justify-between px-4 pt-3 lg:hidden">
             <span className="flex items-center gap-2 font-bold"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink text-page"><TrendingUp size={16} strokeWidth={2.6} /></span>{L('הכסף שלי', 'My Money')}</span>
-            <div className="flex items-center">{toggles}</div>
+            <div className="flex items-center">{toggles}{settingsLink}</div>
           </div>
         )}
         {!fullscreen && <UpdateBanner />}
@@ -112,8 +117,8 @@ export default function App() {
       {!fullscreen && (
         <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden">
           {nav.map((n) => (
-            <NavLink key={n.to} to={n.to} className={cx('flex flex-1 flex-col items-center gap-0.5 py-2 text-[10.5px] font-medium', active(n) ? 'text-ink' : 'text-muted')}>
-              <n.icon size={19} className={active(n) ? 'text-accent' : ''} /><span className="max-w-full truncate px-0.5">{n.label}</span>
+            <NavLink key={n.to} to={n.to} className={cx('flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs font-medium', active(n) ? 'text-ink' : 'text-muted')}>
+              <n.icon size={21} className={active(n) ? 'text-accent' : ''} /><span className="max-w-full truncate px-0.5">{n.label}</span>
             </NavLink>
           ))}
         </nav>

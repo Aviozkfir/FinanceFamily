@@ -5,6 +5,7 @@ import { SPEND_BUCKETS } from '../lib/types';
 import { bucketName, useL, useLang, useStore } from '../lib/store';
 import { monthLabel, pct } from '../lib/format';
 import { analyzeMonth } from '../lib/analysis/compute';
+import OverTimeTabs from '../components/OverTimeTabs';
 import { BUCKET_COLOR, Button, Dot, Empty, IconButton, Modal, Money, PageHeader, Pill, cx } from '../components/ui';
 
 export default function HistoryPage() {
@@ -24,7 +25,8 @@ export default function HistoryPage() {
 
   return (
     <div className="rise">
-      <PageHeader title={L('היסטוריה', 'History')} subtitle={L('כל החודשים שמילאת. סמן כמה חודשים כדי לנתח אותם יחד.', 'Every month you filled in. Select several to analyze them together.')}>
+      <OverTimeTabs value="months" />
+      <PageHeader title={L('החודשים שלי', 'My months')} subtitle={L('כל החודשים שמילאת. סמן כמה חודשים כדי לנתח אותם יחד.', 'Every month you filled in. Select several to analyze them together.')}>
         {analyzable.length > 1 && (
           <Button onClick={() => setPicked(picked.size === analyzable.length ? new Set() : new Set(analyzable.map((m) => m.key)))}>
             {picked.size === analyzable.length ? L('נקה בחירה', 'Clear selection') : L('בחר הכול', 'Select all')}

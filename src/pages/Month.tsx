@@ -70,13 +70,14 @@ export default function MonthPage() {
   const classified = m.txs.filter((t) => t.categoryId).length;
   const guesses = m.txs.filter((t) => sourceOf(t) === 'guess').length;
   const incomeTotal = sumItems(m.incomes);
+  const prevIncomes = db.months[shiftMonth(key, -1)]?.incomes ?? [];
   const goalIncome = m.goal ? sumItems(m.goal.incomes) : 0;
   const manualPatch = (id: string, p: Partial<ManualItem>) => setManual(key, m.manual.map((x) => (x.id === id ? { ...x, ...p } : x)));
   const canAnalyze = m.txs.length > 0 || m.manual.length > 0;
 
   return (
     <div className="rise space-y-4">
-      <PageHeader title={L('מילוי וניתוח חודש', 'Fill in & analyze a month')} subtitle={L('ארבעה צעדים קצרים — ואז הניתוח', 'Four short steps — then the analysis')}>
+      <PageHeader title={monthLabel(key, lang)} subtitle={L('ארבעה צעדים קצרים — ואז התמונה של החודש', 'Four short steps — then the picture of the month')}>
         <MonthSwitcher value={key} onChange={(k) => navigate(`/month/${k}`)} />
       </PageHeader>
 
@@ -98,10 +99,19 @@ export default function MonthPage() {
 
       <Step n={1} done={incomeTotal > 0} title={L('הכנסות בפועל', 'Actual income')} hint={L('מה באמת נכנס החודש', 'What actually came in this month')}
         action={incomeTotal > 0 ? <Money value={incomeTotal} className="text-lg font-bold" /> : undefined}>
-        {m.goal && !m.incomes.length && (
-          <Button size="sm" className="mb-3" onClick={() => setIncomes(key, m.goal!.incomes.map((i) => ({ ...i, id: uid() })))}>
-            {L('העתק מהיעד', 'Copy from goal')} · <Money value={goalIncome} />
-          </Button>
+        {!m.incomes.length && (m.goal || prevIncomes.length > 0) && (
+          <div className="mb-3 flex flex-wrap gap-2">
+            {prevIncomes.length > 0 && (
+              <Button size="sm" variant="primary" onClick={() => setIncomes(key, prevIncomes.map((i) => ({ ...i, id: uid() })))}>
+                {L('כמו בחודש הקודם', 'Same as last month')} · <Money value={sumItems(prevIncomes)} />
+              </Button>
+            )}
+            {m.goal && (
+              <Button size="sm" onClick={() => setIncomes(key, m.goal!.incomes.map((i) => ({ ...i, id: uid() })))}>
+                {L('העתק מהיעד', 'Copy from goal')} · <Money value={goalIncome} />
+              </Button>
+            )}
+          </div>
         )}
         <IncomeEditor items={m.incomes} onChange={(v) => setIncomes(key, v)} placeholder={L('מקור ההכנסה', 'Income source')} />
       </Step>

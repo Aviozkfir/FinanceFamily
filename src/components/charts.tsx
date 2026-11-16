@@ -293,7 +293,7 @@ export function RankBars({ rows, lang }: { rows: { key: string; label: string; s
  * split drawn right under it on the same scale. When spending passed the income the bar runs
  * past a marked "income" line instead.
  */
-export function MonthPicture({ a }: { a: MonthAnalysis }) {
+export function MonthPicture({ a, legend }: { a: MonthAnalysis; legend?: boolean }) {
   const lang = useLang();
   const L = (he: string, en: string) => (lang === 'he' ? he : en);
   const scale = Math.max(a.income, a.totalSpent, 1);
@@ -325,6 +325,11 @@ export function MonthPicture({ a }: { a: MonthAnalysis }) {
         </>}
       </div>
       {over && <p className="mt-2 text-[13px] text-ink2">{L('הקו מסמן את ההכנסה — ההוצאות עברו אותו.', 'The line marks your income — spending went past it.')}</p>}
+      {legend && (
+        <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-1.5 text-sm">
+          {actual.map((x) => <li key={x.id} className="flex items-center gap-1.5 text-ink2"><Dot color={x.color} />{x.label} <Money value={x.value} className="font-semibold text-ink" /></li>)}
+        </ul>
+      )}
     </div>
   );
 }

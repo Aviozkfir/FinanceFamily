@@ -1,5 +1,21 @@
 [
   {
+    "version": "1.4.0",
+    "date": "2026-11-16",
+    "he": [
+      "שלוש לשוניות במקום שש: בית, חודש, לאורך זמן. ההגדרות עברו לסמל בראש המסך.",
+      "מסך הבית מציג את הצעד הבא ואת התמונה של החודש האחרון, ותו לא.",
+      "היסטוריה ומגמות אוחדו ללשונית אחת.",
+      "אפשר למלא הכנסות בלחיצה אחת, כמו בחודש הקודם."
+    ],
+    "en": [
+      "Three tabs instead of six: Home, Month, Over time. Settings moved to an icon at the top.",
+      "The home screen shows the next step and the picture of the last month, and nothing else.",
+      "History and trends are merged into one tab.",
+      "Income can be filled in with one tap, same as last month."
+    ]
+  },
+  {
     "version": "1.3.0",
     "date": "2026-11-16",
     "he": [

@@ -5,6 +5,7 @@ import { SPEND_BUCKETS } from '../lib/types';
 import { bucketName, useL, useLang, useStore } from '../lib/store';
 import { merchantKey, monthLabel, pct } from '../lib/format';
 import { analyzeMany, buildForecast } from '../lib/analysis/forecast';
+import OverTimeTabs from '../components/OverTimeTabs';
 import { BUCKET_COLOR, Card, CardTitle, Dot, Empty, Money, PageHeader, cx } from '../components/ui';
 import { MonthsChart, RankBars } from '../components/charts';
 
@@ -23,6 +24,7 @@ export default function TrendsPage() {
   if (!available.length) {
     return (
       <div className="rise">
+        <OverTimeTabs value="trends" />
         <PageHeader title={L('מגמות ותחזית', 'Trends & forecast')} />
         <Empty icon={<TrendingUp size={30} />} title={L('אין עדיין חודשים לניתוח', 'No months to analyze yet')}>
           <p>{L('מלא לפחות חודש אחד כדי לראות מגמות ותחזית לחודש הבא.', 'Fill in at least one month to see trends and a forecast for the next one.')}</p>
@@ -54,6 +56,7 @@ export default function TrendsPage() {
 
   return (
     <div className="rise space-y-4">
+      <OverTimeTabs value="trends" />
       <PageHeader title={L('מגמות ותחזית', 'Trends & forecast')} subtitle={L('ניתוח של כמה חודשים יחד, ומה צפוי בחודש הבא', 'Several months analyzed together, and what to expect next month')} />
 
       <div className="flex flex-wrap gap-2">
