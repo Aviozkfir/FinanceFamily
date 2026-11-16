@@ -83,7 +83,7 @@ export default function Home() {
           </Card>
           <Card className="flex flex-col items-center justify-center gap-4 lg:col-span-2">
             <Donut size={190}
-              slices={SPEND_BUCKETS.map((b) => ({ id: b, label: bucketName(b, lang), value: latest.spent[b], color: BUCKET_COLOR[b] }))}
+              slices={(['needs', 'wants'] as const).map((b) => ({ id: b, label: bucketName(b, lang), value: latest.spent[b], color: BUCKET_COLOR[b] }))}
               center={<><span className="text-xs text-muted">{L('סך הוצאות', 'Total spent')}</span><Money value={latest.totalSpent} className="text-2xl font-bold" /></>} />
             <div className="grid w-full grid-cols-2 gap-3 text-center">
               <div className="rounded-xl bg-surface2 p-3"><p className="text-xs text-muted">{L('הכנסה', 'Income')}</p><Money value={latest.income} className="font-semibold" /></div>

@@ -1,23 +1,26 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { DndContext, DragOverlay, MouseSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
-import { Check, Globe, Layers, Pencil, Plus, Repeat, Search, Sparkles, Trash2, Wand2, X } from 'lucide-react';
+import { Check, CheckCheck, Globe, Layers, Pencil, Plus, Repeat, Search, Sparkles, Trash2, Wand2, X } from 'lucide-react';
 import type { BucketId, Category, Tx } from '../lib/types';
 import { bucketName, categoryName, emptyMonth, useL, useLang, useStore } from '../lib/store';
 import { dayLabel, isMonthKey, merchantKey, money, monthLabel } from '../lib/format';
-import { guessBucket } from '../lib/heuristics';
-import { aiErrorText, askAi } from '../lib/ai';
+import { sourceOf, type Source } from '../lib/learn';
 import { BUCKET_COLOR, Button, Dot, IconButton, Modal, Money, Segmented, TextInput, cx } from '../components/ui';
 
-interface Item { id: string; txs: Tx[]; merchant: string; amount: number; categoryId: string | null }
+/** `source` is the least certain one among the item's transactions, so one guess marks the whole bubble. */
+interface Item { id: string; txs: Tx[]; merchant: string; amount: number; categoryId: string | null; source: Source | null; hint?: string }
+const RANK: Record<Source, number> = { user: 0, learned: 1, guess: 2 };
+const weakest = (a: Source | null, b: Source | null): Source | null => (!a ? b : !b ? a : RANK[a] >= RANK[b] ? a : b);
 
 function buildItems(txs: Tx[], grouped: boolean): Item[] {
-  if (!grouped) return txs.map((t) => ({ id: t.id, txs: [t], merchant: t.merchant, amount: t.amount, categoryId: t.categoryId }));
+  if (!grouped) return txs.map((t) => ({ id: t.id, txs: [t], merchant: t.merchant, amount: t.amount, categoryId: t.categoryId, source: sourceOf(t), hint: t.hint }));
   const map = new Map<string, Item>();
   for (const t of txs) {
     const id = `g:${merchantKey(t.merchant)}|${t.categoryId ?? ''}`;
-    const it = map.get(id) ?? { id, txs: [], merchant: t.merchant, amount: 0, categoryId: t.categoryId };
+    const it: Item = map.get(id) ?? { id, txs: [], merchant: t.merchant, amount: 0, categoryId: t.categoryId, source: null };
     it.txs.push(t); it.amount += t.amount;
+    it.source = weakest(it.source, sourceOf(t)); it.hint ??= t.hint;
     map.set(id, it);
   }
   return [...map.values()];
@@ -28,10 +31,13 @@ function BubbleBody({ item, color, selected, overlay, extra }: { item: Item; col
   const abs = Math.abs(item.amount);
   const size = abs >= 500 ? 'px-4 py-2.5 text-[15px]' : abs >= 100 ? 'px-3.5 py-2 text-sm' : 'px-3 py-1.5 text-[13px]';
   const t0 = item.txs[0];
+  const guess = item.source === 'guess';
   return (
     <span className={cx('inline-flex max-w-full select-none items-center gap-2 rounded-full border bg-surface2 font-medium transition-shadow', size,
-      selected ? 'border-accent ring-2 ring-accent' : 'border-line-strong hover:border-ink2', overlay && 'cursor-grabbing shadow-2xl')}
+      selected ? 'border-accent ring-2 ring-accent' : guess ? 'border-dashed border-warn' : 'border-line-strong hover:border-ink2', overlay && 'cursor-grabbing shadow-2xl')}
       style={{ boxShadow: overlay ? undefined : `inset 3px 0 0 ${color}, inset -3px 0 0 ${color}` }}>
+      {guess && <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-warn text-[11px] font-bold leading-none text-page">?</span>}
+      {item.source === 'learned' && <Sparkles size={12} className="shrink-0 text-muted" />}
       <bdi className="truncate" style={{ maxWidth: 190 }}>{item.merchant}</bdi>
       {item.txs.length > 1 && <span className="rounded-full bg-surface3 px-1.5 text-[11px] text-ink2">×{item.txs.length}</span>}
       {item.txs.some((t) => t.standing) && <Repeat size={12} className="shrink-0 text-muted" />}
@@ -60,7 +66,8 @@ function Zone({ id, className, children, highlight = true }: { id: string; class
   return <div ref={setNodeRef} className={cx(className, 'transition-colors', isOver && highlight && '!border-accent !bg-accent-soft')}>{children}</div>;
 }
 
-const BUCKETS: BucketId[] = ['needs', 'wants', 'invest', 'ignore'];
+// Savings is what is left of the income, so it is not a place to put a card transaction.
+const BUCKETS: BucketId[] = ['needs', 'wants', 'ignore'];
 
 export default function ClassifyPage() {
   const { month = '' } = useParams();
@@ -68,7 +75,7 @@ export default function ClassifyPage() {
   const L = useL();
   const lang = useLang();
   const db = useStore((s) => s.db);
-  const { assign, applyRules, addCategory, updateCategory, removeCategory } = useStore();
+  const { assign, confirm, suggestRest, addCategory, updateCategory, removeCategory } = useStore();
   const key = isMonthKey(month) ? month : '';
   const m = db.months[key] ?? emptyMonth(key);
 
@@ -77,7 +84,7 @@ export default function ClassifyPage() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [dragId, setDragId] = useState<string | null>(null);
   const [catModal, setCatModal] = useState<{ id?: string; name: string; bucket: BucketId } | null>(null);
-  const [aiBusy, setAiBusy] = useState(false);
+  const [onlyGuesses, setOnlyGuesses] = useState(false);
   const [toast, setToast] = useState('');
 
   const sensors = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: 6 } }), useSensor(TouchSensor, { activationConstraint: { delay: 160, tolerance: 8 } }));
@@ -85,9 +92,11 @@ export default function ClassifyPage() {
   const items = useMemo(() => buildItems(m.txs, grouped).sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount)), [m.txs, grouped]);
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
   const q = query.trim().toLowerCase();
-  const match = (i: Item) => !q || i.merchant.toLowerCase().includes(q);
+  const guesses = items.filter((i) => i.source === 'guess');
+  const reviewing = onlyGuesses && guesses.length > 0;
+  const match = (i: Item) => (!q || i.merchant.toLowerCase().includes(q)) && (!reviewing || i.source === 'guess');
   const pool = items.filter((i) => !i.categoryId);
-  const cats = db.categories;
+  const cats = db.categories.filter((c) => c.bucket !== 'invest');
   const catById = new Map(cats.map((c) => [c.id, c]));
   const colorOf = (categoryId: string | null) => BUCKET_COLOR[categoryId ? catById.get(categoryId)?.bucket ?? 'none' : 'none'];
 
@@ -120,35 +129,16 @@ export default function ClassifyPage() {
   });
 
   function autoClassify() {
-    const extra: Record<string, string> = {};
-    for (const t of m.txs) if (!t.categoryId) { const g = guessBucket(t.merchant); if (g) extra[merchantKey(t.merchant)] = g; }
-    const n = applyRules(key, extra);
-    setToast(n ? L(`${n} עסקאות סווגו אוטומטית — כדאי לעבור עליהן`, `${n} transactions classified automatically — worth a quick review`) : L('לא נמצאו התאמות אוטומטיות', 'No automatic matches found'));
-  }
-
-  async function aiClassify() {
-    const names = [...new Set(m.txs.filter((t) => !t.categoryId).map((t) => t.merchant))];
-    if (!names.length) return;
-    setAiBusy(true);
-    try {
-      const context = JSON.stringify({ categories: cats.map((c) => ({ id: c.id, name: categoryName(c, 'en'), counts_as: c.bucket })), merchants: names });
-      const answer = await askAi({
-        context, db,
-        messages: [{ role: 'user', content: 'Classify every merchant in "merchants" into one of the category ids in "categories". These are Israeli credit card merchant names (possibly truncated). needs = essentials (groceries, pharmacy, fuel, bills, municipality, telecom, health, education); wants = discretionary (restaurants, cafes, shopping, entertainment, subscriptions, gifts); invest = savings/investments; ignore = should not count. Prefer a matching custom category when one clearly fits. Reply with ONLY a JSON object mapping each merchant string exactly as given to a category id. No prose, no code fence.' }],
-      }, () => {});
-      const json = JSON.parse(answer.slice(answer.indexOf('{'), answer.lastIndexOf('}') + 1)) as Record<string, string>;
-      const extra: Record<string, string> = {};
-      for (const [name, id] of Object.entries(json)) if (catById.has(id)) extra[merchantKey(name)] = id;
-      const n = applyRules(key, extra);
-      setToast(L(`Claude סיווג ${n} עסקאות — כדאי לעבור עליהן`, `Claude classified ${n} transactions — worth a quick review`));
-    } catch (e) {
-      setToast(e instanceof SyntaxError ? L('התשובה מ-Claude לא הייתה תקינה. נסה שוב.', 'Claude returned an invalid answer. Try again.') : aiErrorText(e instanceof Error ? e.message : String(e), lang));
-    } finally { setAiBusy(false); }
+    const n = suggestRest(key);
+    setToast(n ? L(`${n} עסקאות קיבלו הצעה — הן מסומנות ב-? עד שתאשר`, `${n} transactions got a suggestion — marked with ? until you confirm`) : L('אין לי עדיין מספיק מידע כדי להציע סיווג לאלה', 'I do not know enough yet to suggest a category for these'));
   }
 
   const classifiedCount = m.txs.filter((t) => t.categoryId).length;
   const dragItem = dragId ? byId.get(dragId) : null;
   const selAmount = [...selected].reduce((s, id) => s + (byId.get(id)?.amount ?? 0), 0);
+  const selItems = [...selected].map((id) => byId.get(id)).filter((i): i is Item => !!i);
+  const selUnconfirmed = selItems.some((i) => i.source === 'guess' || i.source === 'learned');
+  const selHint = selItems.length === 1 && selItems[0].source === 'guess' ? selItems[0].hint : undefined;
 
   return (
     <DndContext sensors={sensors} onDragStart={(e) => setDragId(String(e.active.id))} onDragEnd={onDragEnd} onDragCancel={() => setDragId(null)}>
@@ -157,17 +147,28 @@ export default function ClassifyPage() {
         <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-surface px-4 py-3">
           <div className="me-auto min-w-0">
             <h1 className="truncate text-lg font-bold">{L('סיווג עסקאות', 'Classify transactions')} · {monthLabel(key, lang)}</h1>
-            <p className="text-[13px] text-muted">{L(`${classifiedCount} מתוך ${m.txs.length} סווגו`, `${classifiedCount} of ${m.txs.length} classified`)} · {L('גרור בועה, או לחץ לבחירת כמה יחד', 'Drag a bubble, or click to select several')}</p>
+            <p className="text-[13px] text-muted">{L(`${classifiedCount} מתוך ${m.txs.length} סווגו`, `${classifiedCount} of ${m.txs.length} classified`)} · {L('גרור בועה, או לחץ עליה כדי לבחור', 'Drag a bubble, or tap it to select')}</p>
           </div>
           <div className="relative">
             <Search size={15} className="pointer-events-none absolute inset-y-0 start-3 my-auto text-muted" />
             <TextInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder={L('חיפוש בית עסק', 'Search merchant')} className="!h-9 w-44 !ps-9" />
           </div>
           <Button size="sm" variant={grouped ? 'soft' : 'ghost'} icon={<Layers size={15} />} onClick={() => setGrouped(!grouped)} aria-pressed={grouped}>{L('קבץ לפי בית עסק', 'Group by merchant')}</Button>
-          <Button size="sm" icon={<Wand2 size={15} />} onClick={autoClassify} disabled={!pool.length}>{L('סיווג אוטומטי', 'Auto-classify')}</Button>
-          <Button size="sm" icon={<Sparkles size={15} />} onClick={aiClassify} disabled={!pool.length || aiBusy}>{aiBusy ? L('Claude מסווג…', 'Claude is sorting…') : L('סווג עם Claude', 'Classify with Claude')}</Button>
+          <Button size="sm" icon={<Wand2 size={15} />} onClick={autoClassify} disabled={!pool.length}>{L('הצע סיווג', 'Suggest')}</Button>
           <Button size="sm" variant="primary" icon={<Check size={15} />} onClick={() => navigate(`/month/${key}`)}>{L('שמור וסיים', 'Save & finish')}</Button>
         </header>
+
+        {/* What the app decided by itself, and how sure it is */}
+        {guesses.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-surface2 px-4 py-2.5 text-sm">
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-warn text-xs font-bold text-page">?</span>
+            <span className="me-auto font-medium">{L(`${guesses.length} ניחושים לאישור`, `${guesses.length} guesses to confirm`)} · <Money value={guesses.reduce((s, i) => s + i.amount, 0)} /></span>
+            <Button size="sm" variant={reviewing ? 'primary' : 'soft'} aria-pressed={reviewing} onClick={() => setOnlyGuesses(!onlyGuesses)}>{reviewing ? L('הצג הכול', 'Show all') : L('הצג רק ניחושים', 'Show only guesses')}</Button>
+            <Button size="sm" icon={<CheckCheck size={15} />} onClick={() => { confirm(key, idsFor(guesses.map((i) => i.id))); setSelected(new Set()); }}>{L('אשר הכול', 'Confirm all')}</Button>
+          </div>
+        ) : items.some((i) => i.source === 'learned') ? (
+          <p className="flex items-center gap-1.5 border-b border-line bg-surface2 px-4 py-2 text-[13px] text-muted"><Sparkles size={13} />{L('מסומן כך: סווג לבד, לפי מה שבחרת בעבר', 'Marked like this: classified automatically, from what you chose before')}</p>
+        ) : null}
 
         <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,2fr)_minmax(0,3fr)] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:grid-rows-1">
           {/* Pool */}
@@ -226,6 +227,12 @@ export default function ClassifyPage() {
         {selected.size > 0 && (
           <div className="rise fixed inset-x-3 bottom-4 z-40 mx-auto flex max-w-3xl flex-wrap items-center gap-2 rounded-2xl border border-line-strong bg-surface3 p-3 shadow-2xl">
             <span className="me-1 text-sm font-semibold">{L(`${selected.size} נבחרו`, `${selected.size} selected`)} · <Money value={selAmount} /></span>
+            {selItems.some((i) => i.source === 'guess') && <span className="w-full text-[13px] text-warn">{selHint ? <>{L('ניחוש לפי', 'Guessed from')} <bdi>{selHint}</bdi></> : L('ניחוש — אשר, או העבר לקטגוריה הנכונה', 'A guess — confirm it, or move it to the right category')}</span>}
+            {selUnconfirmed && selItems.every((i) => i.categoryId) && (
+              <button onClick={() => { confirm(key, idsFor(selected)); setSelected(new Set()); }} className="flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[13px] font-semibold text-page">
+                <Check size={14} />{L('נכון, אשר', 'Correct, confirm')}
+              </button>
+            )}
             {cats.map((c) => (
               <button key={c.id} onClick={() => moveItems(selected, c.id)} className="flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 text-[13px] font-medium hover:border-accent">
                 <Dot color={BUCKET_COLOR[c.bucket]} />{categoryName(c, lang)}

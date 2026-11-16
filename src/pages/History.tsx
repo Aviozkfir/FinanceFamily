@@ -60,7 +60,6 @@ export default function HistoryPage() {
                       <Link to={has ? `/month/${m.key}/analysis` : m.goal ? `/goal/${m.key}` : `/month/${m.key}`} className="text-lg font-bold hover:underline">{monthLabel(m.key, lang)}</Link>
                       {m.goal && <Pill tone="accent"><Target size={11} />{L('יעד', 'Goal')}</Pill>}
                       {a.unclassified.count > 0 && <Pill tone="warn">{L(`${a.unclassified.count} לא מסווגות`, `${a.unclassified.count} unclassified`)}</Pill>}
-                      {m.ai?.summary && <Pill>{L('סיכום AI', 'AI summary')}</Pill>}
                     </div>
                     {has ? (
                       <>

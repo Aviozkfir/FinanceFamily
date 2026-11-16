@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
-import { Check, Download, KeyRound, RefreshCw, Terminal, Trash2, Upload } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Download, RefreshCw, Trash2, Upload } from 'lucide-react';
 import type { BucketId, DB, Split } from '../lib/types';
 import { SPEND_BUCKETS } from '../lib/types';
 import { bucketName, useL, useLang, useStore } from '../lib/store';
-import { fetchAiStatus, type AiStatus } from '../lib/ai';
-import { API_KEY_STORAGE, isNative } from '../lib/platform';
+import { isNative } from '../lib/platform';
+import { buildModel } from '../lib/learn';
 import { CURRENT, checkForUpdate, installUpdate, useUpdate } from '../lib/update';
 import { BUCKET_COLOR, Button, Card, CardTitle, Dot, IconButton, PageHeader, Pill, Segmented, TextInput, cx } from '../components/ui';
 
@@ -14,29 +14,15 @@ export default function SettingsPage() {
   const db = useStore((s) => s.db);
   const { setSettings, updateCategory, removeCategory, replaceDb } = useStore();
   const s = db.settings;
-  const [status, setStatus] = useState<AiStatus | null>(null);
-  const [apiKey, setApiKey] = useState('');
-  const [keySaved, setKeySaved] = useState(false);
   const [split, setSplit] = useState<Split>(s.split);
   const [importMsg, setImportMsg] = useState('');
   const importRef = useRef<HTMLInputElement>(null);
   const update = useUpdate();
 
-  useEffect(() => { fetchAiStatus().then(setStatus); }, []);
   const splitSum = split.needs + split.wants + split.invest;
   useEffect(() => { if (splitSum === 100) setSettings({ split }); }, [split]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const native = isNative();
-  async function saveKey(value: string) {
-    if (native) {
-      if (value) localStorage.setItem(API_KEY_STORAGE, value); else localStorage.removeItem(API_KEY_STORAGE);
-      setApiKey(''); setKeySaved(true); setStatus(await fetchAiStatus()); setTimeout(() => setKeySaved(false), 2500);
-      return;
-    }
-    const res = await fetch('/api/ai/key', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ apiKey: value }) }).catch(() => null);
-    if (res?.ok) { setApiKey(''); setKeySaved(true); setStatus(await fetchAiStatus()); setTimeout(() => setKeySaved(false), 2500); }
-  }
-
   function exportData() {
     const url = URL.createObjectURL(new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' }));
     const a = document.createElement('a');
@@ -53,11 +39,7 @@ export default function SettingsPage() {
   }
 
   const custom = db.categories.filter((c) => !c.builtin);
-  const providers = [
-    { value: 'auto' as const, title: L('אוטומטי', 'Automatic'), desc: L('Claude Code אם הוא מותקן ומחובר, אחרת מפתח API', 'Claude Code when installed and signed in, otherwise the API key') },
-    { value: 'claude-code' as const, title: L('החשבון שלי ב-Claude', 'My Claude account'), desc: L('דרך ההתחברות של Claude Code במחשב הזה — בלי מפתח, על חשבון המנוי', 'Through the Claude Code sign-in on this computer — no key, uses your subscription') },
-    { value: 'api' as const, title: L('מפתח API', 'API key'), desc: L('חיוב לפי שימוש דרך Anthropic Console', 'Pay-as-you-go through the Anthropic Console') },
-  ];
+  const learned = useMemo(() => buildModel(db).known.size, [db]);
 
   return (
     <div className="rise max-w-3xl space-y-4">
@@ -88,42 +70,6 @@ export default function SettingsPage() {
       </Card>
 
       <Card>
-        <CardTitle hint={L('העוזר שמסכם, מנתח ועונה על שאלות', 'The assistant that summarizes, analyzes and answers questions')}>{L('חיבור ל-Claude', 'Claude connection')}</CardTitle>
-        {native && <p className="mb-3 text-sm text-ink2">{L('בטלפון העוזר עובד עם מפתח API של Anthropic. המפתח נשמר במכשיר הזה בלבד.', 'On the phone the assistant uses an Anthropic API key. The key is stored on this device only.')}</p>}
-        <div className={cx('space-y-2', native && 'hidden')}>
-          {providers.map((p) => (
-            <button key={p.value} onClick={() => setSettings({ aiProvider: p.value })} aria-pressed={s.aiProvider === p.value}
-              className={cx('flex w-full items-start gap-3 rounded-2xl border p-4 text-start transition-colors', s.aiProvider === p.value ? 'border-accent bg-accent-soft' : 'border-line bg-surface2 hover:border-line-strong')}>
-              <span className={cx('mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border', s.aiProvider === p.value ? 'border-accent bg-accent text-page' : 'border-line-strong')}>
-                {s.aiProvider === p.value && <Check size={12} strokeWidth={3.5} />}</span>
-              <span><span className="block font-semibold">{p.title}</span><span className="block text-[13px] text-muted">{p.desc}</span></span>
-            </button>
-          ))}
-        </div>
-
-        <div className="mt-4 grid gap-3 sm:grid-cols-2">
-          <div className={cx('rounded-2xl bg-surface2 p-4', native && 'hidden')}>
-            <p className="flex items-center gap-2 text-sm font-semibold"><Terminal size={15} />Claude Code</p>
-            <div className="mt-2">{status == null ? <Pill>…</Pill> : status.cli ? <Pill tone="good">● {L('מותקן', 'Installed')} · {status.cliVersion}</Pill> : <Pill tone="warn">{L('לא נמצא במחשב', 'Not found on this computer')}</Pill>}</div>
-            <p className="mt-2 text-xs text-muted">{L('אם העוזר מדווח שאינך מחובר: פתח טרמינל, הרץ claude והתחבר עם חשבון Claude שלך.', 'If the assistant says you are not signed in: open a terminal, run claude and sign in with your Claude account.')}</p>
-          </div>
-          <div className="rounded-2xl bg-surface2 p-4">
-            <p className="flex items-center gap-2 text-sm font-semibold"><KeyRound size={15} />{L('מפתח API', 'API key')}</p>
-            <div className="mt-2">{status?.hasApiKey ? <Pill tone="good">● {L('מפתח שמור', 'Key saved')}</Pill> : <Pill>{L('לא הוגדר', 'Not set')}</Pill>}</div>
-            <form className="mt-2 flex gap-2" onSubmit={(e) => { e.preventDefault(); if (apiKey.trim()) saveKey(apiKey.trim()); }}>
-              <TextInput type="password" dir="ltr" autoComplete="off" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-ant-…" className="!h-9" />
-              <Button size="sm" type="submit" disabled={!apiKey.trim()}>{keySaved ? <Check size={15} /> : L('שמור', 'Save')}</Button>
-              {status?.hasApiKey && <IconButton type="button" label={L('מחק מפתח', 'Remove key')} onClick={() => saveKey('')}><Trash2 size={15} /></IconButton>}
-            </form>
-            <p className="mt-2 text-xs text-muted">{native ? L('המפתח נשמר במכשיר הזה בלבד.', 'The key is stored on this device only.') : L('המפתח נשמר בקובץ מקומי במחשב שלך בלבד.', 'The key is stored in a local file on your computer only.')}</p>
-          </div>
-        </div>
-        <label className="mt-4 block max-w-sm"><span className="mb-1.5 block text-sm text-ink2">{L('מודל (לא חובה)', 'Model (optional)')}</span>
-          <TextInput dir="ltr" value={s.aiModel} onChange={(e) => setSettings({ aiModel: e.target.value.trim() })} placeholder={status?.defaultModel ?? 'claude-opus-5-5'} />
-          <span className="mt-1 block text-xs text-muted">{L('השאר ריק לברירת המחדל.', 'Leave empty for the default.')}</span></label>
-      </Card>
-
-      <Card>
         <CardTitle hint={L('קטגוריות חדשות מוסיפים מלוח הסיווג', 'New categories are added from the classification board')}>{L('הקטגוריות שלי', 'My categories')}</CardTitle>
         {custom.length ? (
           <ul className="space-y-2">
@@ -133,7 +79,7 @@ export default function SettingsPage() {
                 <TextInput value={c.name} onChange={(e) => updateCategory(c.id, { name: e.target.value })} className="min-w-32 flex-1" aria-label={L('שם הקטגוריה', 'Category name')} />
                 <select value={c.bucket} onChange={(e) => updateCategory(c.id, { bucket: e.target.value as BucketId })} aria-label={L('נספר תחת', 'Counts as')}
                   className="h-10 rounded-xl border border-line bg-surface2 px-2 text-sm focus:border-accent focus:outline-none">
-                  {(['needs', 'wants', 'invest', 'ignore'] as BucketId[]).map((b) => <option key={b} value={b}>{bucketName(b, lang)}</option>)}
+                  {(['needs', 'wants', ...(c.bucket === 'invest' ? ['invest'] : []), 'ignore'] as BucketId[]).map((b) => <option key={b} value={b}>{bucketName(b, lang)}</option>)}
                 </select>
                 <IconButton label={L('מחק קטגוריה', 'Delete category')} onClick={() => removeCategory(c.id)}><Trash2 size={16} /></IconButton>
               </li>
@@ -141,7 +87,7 @@ export default function SettingsPage() {
           </ul>
         ) : <p className="text-sm text-muted">{L('עדיין לא יצרת קטגוריות משלך.', 'You have not created any categories yet.')}</p>}
         <p className="mt-4 border-t border-line pt-3 text-[13px] text-muted">
-          {L(`האפליקציה זוכרת ${Object.keys(db.merchantRules).length} בתי עסק שכבר סיווגת, ומסווגת אותם לבד בקובץ הבא.`, `The app remembers ${Object.keys(db.merchantRules).length} merchants you already classified and sorts them automatically next time.`)}
+          {L(`האפליקציה למדה ממך ${learned} בתי עסק, ומסווגת אותם ודומים להם לבד בקובץ הבא. היא לומדת רק מבחירות שעשית או אישרת, במכשיר הזה בלבד.`, `The app has learned ${learned} merchants from you, and classifies them and similar ones automatically next time. It learns only from choices you made or confirmed, on this device only.`)}
         </p>
       </Card>
 

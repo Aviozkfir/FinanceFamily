@@ -89,12 +89,12 @@ export function BucketMeters({ a }: { a: MonthAnalysis }) {
     <div className="space-y-5">
       {SPEND_BUCKETS.map((b) => {
         const target = a.target[b];
-        // For savings, what was left over also counts toward the target.
-        const extra = b === 'invest' ? Math.max(a.leftover, 0) : 0;
+        // Savings is what was left of the income, so there more is better.
         const actual = a.spent[b];
-        const scale = Math.max(target, actual + extra, 1) * 1.08;
+        const guessed = b === 'invest' ? 0 : a.guessed[b];
+        const scale = Math.max(target, actual, 1) * 1.08;
         const over = b !== 'invest' && target > 0 && actual > target;
-        const diff = b === 'invest' ? actual + extra - target : target - actual;
+        const diff = b === 'invest' ? actual - target : target - actual;
         return (
           <div key={b}>
             <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-3">
@@ -107,23 +107,20 @@ export function BucketMeters({ a }: { a: MonthAnalysis }) {
             </div>
             <div className="relative h-3 rounded-full" style={{ background: `var(--${b}-soft)` }}>
               <div className="absolute inset-y-0 start-0 rounded-full" style={{ width: `${(actual / scale) * 100}%`, background: BUCKET_COLOR[b] }} />
-              {extra > 0 && (
-                <div className="absolute inset-y-0 rounded-e-full opacity-45" title={L('עודף שנשאר', 'Left over')}
-                  style={{ insetInlineStart: `calc(${(actual / scale) * 100}% + 2px)`, width: `calc(${(extra / scale) * 100}% - 2px)`, background: BUCKET_COLOR[b] }} />
-              )}
               {target > 0 && <div className="absolute -inset-y-1 w-0.5 rounded bg-ink" style={{ insetInlineStart: `${(target / scale) * 100}%` }} title={L('יעד', 'Target')} />}
             </div>
             {target > 0 && (
               <p className={cx('mt-1.5 text-[13px]', over || (b === 'invest' && diff < 0) ? 'text-bad' : 'text-muted')}>
                 {b === 'invest'
                   ? diff >= 0
-                    ? L(`עומד ביעד${extra > 0 ? ` (כולל עודף של ${money(extra, lang)})` : ''}`, `On target${extra > 0 ? ` (incl. ${money(extra, lang)} left over)` : ''}`)
+                    ? L(`עומד ביעד${diff > 0 ? ` · ${money(diff, lang)} מעליו` : ''}`, `On target${diff > 0 ? ` · ${money(diff, lang)} above it` : ''}`)
                     : L(`▼ חסרים ${money(-diff, lang)} ליעד`, `▼ ${money(-diff, lang)} short of target`)
                   : over
                     ? L(`▲ חריגה של ${money(-diff, lang)} (${pct(actual / target)} מהיעד)`, `▲ ${money(-diff, lang)} over (${pct(actual / target)} of target)`)
                     : L(`נשארו ${money(diff, lang)}`, `${money(diff, lang)} left`)}
               </p>
             )}
+            {guessed !== 0 && <p className="mt-0.5 text-[13px] text-warn">{L(`מתוכם ${money(guessed, lang)} לפי ניחוש שלא אושר`, `${money(guessed, lang)} of this is an unconfirmed guess`)}</p>}
           </div>
         );
       })}

@@ -1,8 +1,9 @@
 import { create } from 'zustand';
-import type { AiState, BucketId, Category, DB, IncomeItem, ImportedFile, Lang, ManualItem, MonthData, Settings, Split, Tx } from './types';
+import type { BucketId, Category, DB, IncomeItem, ImportedFile, Lang, ManualItem, MonthData, Settings, Split, Tx } from './types';
 import { merchantKey, uid } from './format';
 import { txIdentity, type ParsedStatement } from './parser/statement';
 import { isNative } from './platform';
+import { buildModel, suggest } from './learn';
 
 export const DEFAULT_SPLIT: Split = { needs: 50, wants: 30, invest: 20 };
 
@@ -15,14 +16,32 @@ const BUILTIN: Category[] = [
 
 const emptyDb = (): DB => ({
   version: 1,
-  settings: { lang: 'he', theme: 'dark', split: DEFAULT_SPLIT, aiProvider: 'auto', aiModel: '' },
+  settings: { lang: 'he', theme: 'dark', split: DEFAULT_SPLIT },
   categories: BUILTIN,
   merchantRules: {},
   months: {},
-  trendAi: {},
 });
 
-export const emptyMonth = (key: string): MonthData => ({ key, incomes: [], files: [], txs: [], manual: [], ai: { chat: [] } });
+export const emptyMonth = (key: string): MonthData => ({ key, incomes: [], files: [], txs: [], manual: [] });
+
+/**
+ * Brings data saved by an earlier version up to date:
+ * - card transactions can no longer be "savings" (savings is what is left of the income), so
+ *   ones marked that way become "don't count" — which keeps them out of spending, as before;
+ * - whatever the removed AI assistant stored is dropped.
+ */
+function normalize(raw: DB): DB {
+  const base = emptyDb();
+  const { aiProvider: _p, aiModel: _m, ...settings } = { ...base.settings, ...raw.settings } as Settings & { aiProvider?: unknown; aiModel?: unknown };
+  const categories = raw.categories?.length ? raw.categories : base.categories;
+  const savings = new Set(categories.filter((c) => c.bucket === 'invest').map((c) => c.id));
+  const months = Object.fromEntries(Object.entries(raw.months ?? {}).map(([k, month]) => {
+    const { ai: _ai, ...m } = month as MonthData & { ai?: unknown };
+    return [k, { ...m, txs: (m.txs ?? []).map((t) => (t.categoryId && savings.has(t.categoryId) ? { ...t, categoryId: 'ignore' } : t)) }];
+  }));
+  const merchantRules = Object.fromEntries(Object.entries(raw.merchantRules ?? {}).map(([k, c]) => [k, savings.has(c) ? 'ignore' : c]));
+  return { version: 1, settings, categories, merchantRules, months };
+}
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -39,15 +58,17 @@ interface Store {
   importStatements: (key: string, parsed: ParsedStatement[]) => { added: number; skipped: number };
   removeFile: (key: string, fileId: string) => void;
   moveFile: (from: string, fileId: string, to: string) => void;
+  /** The user puts transactions in a category (or back in the pool with null). This is what the classifier learns from. */
   assign: (key: string, txIds: string[], categoryId: string | null) => void;
-  applyRules: (key: string, extra?: Record<string, string>) => number;
+  /** The user accepts the classifier's choice for these transactions as it is. */
+  confirm: (key: string, txIds: string[]) => void;
+  /** Runs the classifier on the month's unclassified transactions; returns how many it placed. */
+  suggestRest: (key: string) => number;
   addCategory: (name: string, bucket: BucketId) => string;
   updateCategory: (id: string, patch: Partial<Pick<Category, 'name' | 'bucket'>>) => void;
   removeCategory: (id: string) => void;
   setManual: (key: string, items: ManualItem[]) => void;
   setIncomes: (key: string, items: IncomeItem[]) => void;
-  setMonthAi: (key: string, fn: (ai: AiState) => AiState) => void;
-  setTrendAi: (key: string, fn: (ai: AiState) => AiState) => void;
   deleteMonth: (key: string) => void;
   replaceDb: (db: DB) => void;
 }
@@ -95,9 +116,8 @@ export const useStore = create<Store>((set, get) => {
         offline = true;
         try { db = JSON.parse(localStorage.getItem('finance-db') ?? 'null'); } catch { db = null; }
       }
-      const base = emptyDb();
-      const merged: DB = db ? { ...base, ...db, settings: { ...base.settings, ...db.settings } } : base;
-      set({ db: merged, ready: true, offline: offline && !isNative() });
+      try { localStorage.removeItem('finance-api-key'); } catch { /* key of the removed AI assistant */ }
+      set({ db: db ? normalize(db) : emptyDb(), ready: true, offline: offline && !isNative() });
     },
 
     setSettings: (patch) => mutate((db) => ({ ...db, settings: { ...db.settings, ...patch } })),
@@ -112,6 +132,7 @@ export const useStore = create<Store>((set, get) => {
       mutate((db) => {
         const month = db.months[key] ?? emptyMonth(key);
         const seen = new Set(month.txs.map(txIdentity));
+        const model = buildModel(db);
         const files: ImportedFile[] = [...month.files];
         const txs: Tx[] = [...month.txs];
         for (const p of parsed) {
@@ -121,9 +142,8 @@ export const useStore = create<Store>((set, get) => {
             const idKey = txIdentity(t);
             if (seen.has(idKey)) { skipped++; continue; }
             seen.add(idKey);
-            const rule = db.merchantRules[merchantKey(t.merchant)];
-            const known = rule && db.categories.some((c) => c.id === rule);
-            fresh.push({ ...t, fileId, categoryId: known ? rule : null });
+            const s = suggest(model, t.merchant);
+            fresh.push({ ...t, fileId, categoryId: s?.categoryId ?? null, ...(s ? { by: s.by, ...(s.hint ? { hint: s.hint } : {}) } : {}) });
           }
           if (!fresh.length) continue;
           added += fresh.length;
@@ -162,31 +182,46 @@ export const useStore = create<Store>((set, get) => {
     assign: (key, txIds, categoryId) =>
       mutate((db) => {
         const ids = new Set(txIds);
+        // A merchant the user sends back to the pool should not come back from an old remembered rule.
         const rules = { ...db.merchantRules };
-        const month = db.months[key] ?? emptyMonth(key);
-        const txs = month.txs.map((t) => {
-          if (!ids.has(t.id)) return t;
-          const k = merchantKey(t.merchant);
-          if (categoryId) rules[k] = categoryId; else delete rules[k];
-          return { ...t, categoryId };
-        });
-        return { ...withMonth(db, key, (m) => ({ ...m, txs })), merchantRules: rules };
+        return { ...withMonth(db, key, (m) => ({
+          ...m,
+          txs: m.txs.map((t) => {
+            if (!ids.has(t.id)) return t;
+            const { by: _by, hint: _hint, ...rest } = t;
+            if (!categoryId) delete rules[merchantKey(t.merchant)];
+            return categoryId ? { ...rest, categoryId, by: 'user' as const } : { ...rest, categoryId: null };
+          }),
+        })), merchantRules: rules };
       }),
 
-    applyRules: (key, extra = {}) => {
+    confirm: (key, txIds) =>
+      mutate((db) => {
+        const ids = new Set(txIds);
+        return withMonth(db, key, (m) => ({
+          ...m,
+          txs: m.txs.map((t) => {
+            if (!ids.has(t.id) || !t.categoryId) return t;
+            const { hint: _hint, ...rest } = t;
+            return { ...rest, by: 'user' as const };
+          }),
+        }));
+      }),
+
+    suggestRest: (key) => {
       let n = 0;
       mutate((db) => {
-        const valid = new Set(db.categories.map((c) => c.id));
-        const rules = { ...db.merchantRules };
-        const txs = (db.months[key]?.txs ?? []).map((t) => {
-          if (t.categoryId) return t;
-          const k = merchantKey(t.merchant);
-          const cat = rules[k] ?? extra[k];
-          if (!cat || !valid.has(cat)) return t;
-          n++;
-          return { ...t, categoryId: cat };
-        });
-        return withMonth(db, key, (m) => ({ ...m, txs }));
+        const model = buildModel(db);
+        return withMonth(db, key, (m) => ({
+          ...m,
+          txs: m.txs.map((t) => {
+            if (t.categoryId) return t;
+            const s = suggest(model, t.merchant);
+            if (!s) return t;
+            n++;
+            return { ...t, categoryId: s.categoryId, by: s.by, ...(s.hint ? { hint: s.hint } : {}) };
+          }),
+        }));
       });
       return n;
     },
@@ -203,7 +238,7 @@ export const useStore = create<Store>((set, get) => {
         if (db.categories.find((c) => c.id === id)?.builtin) return db;
         const months = Object.fromEntries(Object.entries(db.months).map(([k, m]) => [k, {
           ...m,
-          txs: m.txs.map((t) => (t.categoryId === id ? { ...t, categoryId: null } : t)),
+          txs: m.txs.map((t) => { if (t.categoryId !== id) return t; const { by: _by, hint: _hint, ...rest } = t; return { ...rest, categoryId: null }; }),
           manual: m.manual.map((x) => (x.categoryId === id ? { ...x, categoryId: null } : x)),
         }]));
         const merchantRules = Object.fromEntries(Object.entries(db.merchantRules).filter(([, c]) => c !== id));
@@ -212,10 +247,8 @@ export const useStore = create<Store>((set, get) => {
 
     setManual: (key, items) => mutate((db) => withMonth(db, key, (m) => ({ ...m, manual: items }))),
     setIncomes: (key, items) => mutate((db) => withMonth(db, key, (m) => ({ ...m, incomes: items }))),
-    setMonthAi: (key, fn) => mutate((db) => withMonth(db, key, (m) => ({ ...m, ai: fn(m.ai ?? { chat: [] }) }))),
-    setTrendAi: (key, fn) => mutate((db) => ({ ...db, trendAi: { ...db.trendAi, [key]: fn(db.trendAi[key] ?? { chat: [] }) } })),
     deleteMonth: (key) => mutate((db) => { const { [key]: _gone, ...months } = db.months; return { ...db, months }; }),
-    replaceDb: (db) => mutate(() => ({ ...emptyDb(), ...db })),
+    replaceDb: (db) => mutate(() => normalize(db)),
   };
 });
 
@@ -230,7 +263,7 @@ export function useL() {
 const BUCKET_NAMES: Record<BucketId, [string, string]> = {
   needs: ['צרכים', 'Needs'],
   wants: ['רצונות', 'Wants'],
-  invest: ['חיסכון והשקעות', 'Savings & investing'],
+  invest: ['חיסכון', 'Savings'],
   ignore: ['לא לספור', "Don't count"],
 };
 export const bucketName = (b: BucketId, lang: Lang) => BUCKET_NAMES[b][lang === 'he' ? 0 : 1];

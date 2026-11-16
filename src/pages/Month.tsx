@@ -6,6 +6,7 @@ import { SPEND_BUCKETS } from '../lib/types';
 import { bucketName, categoryName, emptyMonth, sumItems, useL, useLang, useStore } from '../lib/store';
 import { currentMonth, isMonthKey, monthLabel, shiftMonth, uid } from '../lib/format';
 import { parseStatementFile, type ParsedStatement } from '../lib/parser/statement';
+import { sourceOf } from '../lib/learn';
 import { AmountInput, BUCKET_COLOR, Button, Card, CardTitle, Dot, IconButton, Money, MonthSwitcher, PageHeader, Pill, Segmented, TextInput, cx } from '../components/ui';
 import { IncomeEditor } from './Goal';
 
@@ -67,6 +68,7 @@ export default function MonthPage() {
   }
 
   const classified = m.txs.filter((t) => t.categoryId).length;
+  const guesses = m.txs.filter((t) => sourceOf(t) === 'guess').length;
   const incomeTotal = sumItems(m.incomes);
   const goalIncome = m.goal ? sumItems(m.goal.incomes) : 0;
   const manualPatch = (id: string, p: Partial<ManualItem>) => setManual(key, m.manual.map((x) => (x.id === id ? { ...x, ...p } : x)));
@@ -154,26 +156,29 @@ export default function MonthPage() {
         )}
       </Step>
 
-      <Step n={3} done={m.txs.length > 0 && classified === m.txs.length} title={L('סיווג עסקאות', 'Classify transactions')}
-        hint={L('כל עסקה היא בועה — גוררים אותה לצרכים, רצונות, חיסכון או לקטגוריה משלך', 'Each transaction is a bubble — drag it to needs, wants, savings or your own category')}>
+      <Step n={3} done={m.txs.length > 0 && classified === m.txs.length && guesses === 0} title={L('סיווג עסקאות', 'Classify transactions')}
+        hint={L('האפליקציה מסווגת לבד לפי מה שלמדה ממך. נשאר לך רק לאשר ניחושים ולסווג את החדשים', 'The app classifies by what it learned from you. You only confirm guesses and place new merchants')}>
         {m.txs.length ? (
           <div className="flex flex-wrap items-center gap-4">
             <div className="min-w-48 flex-1">
               <div className="mb-1.5 flex justify-between text-sm">
                 <span className="text-ink2">{L(`${classified} מתוך ${m.txs.length} סווגו`, `${classified} of ${m.txs.length} classified`)}</span>
-                {classified < m.txs.length && <Pill tone="warn">{L(`נותרו ${m.txs.length - classified}`, `${m.txs.length - classified} left`)}</Pill>}
+                <span className="flex gap-1.5">
+                  {guesses > 0 && <Pill tone="warn">{L(`${guesses} ניחושים לאישור`, `${guesses} guesses to confirm`)}</Pill>}
+                  {classified < m.txs.length && <Pill tone="warn">{L(`נותרו ${m.txs.length - classified}`, `${m.txs.length - classified} left`)}</Pill>}
+                </span>
               </div>
               <div className="h-2 rounded-full bg-surface3"><div className="h-full rounded-full bg-accent transition-all" style={{ width: `${(classified / m.txs.length) * 100}%` }} /></div>
             </div>
-            <Button variant={classified < m.txs.length ? 'primary' : 'soft'} icon={<LayoutGrid size={16} />} onClick={() => navigate(`/month/${key}/classify`)}>
-              {classified < m.txs.length ? L('פתח את לוח הסיווג', 'Open the board') : L('עריכת הסיווג', 'Edit classification')}
+            <Button variant={classified < m.txs.length || guesses > 0 ? 'primary' : 'soft'} icon={<LayoutGrid size={16} />} onClick={() => navigate(`/month/${key}/classify`)}>
+              {classified < m.txs.length || guesses > 0 ? L('פתח את לוח הסיווג', 'Open the board') : L('עריכת הסיווג', 'Edit classification')}
             </Button>
           </div>
         ) : <p className="text-sm text-muted">{L('העלה קובץ אשראי כדי להתחיל לסווג.', 'Upload a statement to start classifying.')}</p>}
       </Step>
 
       <Step n={4} done={m.manual.length > 0} title={L('הכנסות והוצאות נוספות', 'Other income & expenses')}
-        hint={L('מה שלא עובר באשראי: שכר דירה, העברות, מזומן, הפקדה לחיסכון, הכנסה חד-פעמית', 'Anything outside the card: rent, transfers, cash, a savings deposit, one-off income')}>
+        hint={L('מה שלא עובר באשראי: שכר דירה, העברות, מזומן, הכנסה חד-פעמית. הפקדה לחיסכון מסמנים כ"חיסכון" — היא לא נספרת כהוצאה', 'Anything outside the card: rent, transfers, cash, one-off income. Mark a savings deposit as "Savings" — it is not counted as spending')}>
         <div className="space-y-2">
           {m.manual.map((x) => (
             <div key={x.id} className="flex flex-wrap items-center gap-2 rounded-2xl bg-surface2 p-2 sm:flex-nowrap sm:bg-transparent sm:p-0">

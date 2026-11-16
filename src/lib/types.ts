@@ -1,6 +1,10 @@
 export type Lang = 'he' | 'en';
 export type Theme = 'dark' | 'light';
-/** The three budget buckets, plus "ignore" for things that should not count. */
+/**
+ * needs and wants are spending. 'invest' is savings: it is not something a card transaction is
+ * classified as, but what is left of the income after spending (a manual entry can mark money
+ * already put aside). 'ignore' is for things that should not count at all.
+ */
 export type BucketId = 'needs' | 'wants' | 'invest' | 'ignore';
 export type SpendBucket = Exclude<BucketId, 'ignore'>;
 export const SPEND_BUCKETS: SpendBucket[] = ['needs', 'wants', 'invest'];
@@ -35,6 +39,10 @@ export interface Tx {
   /** Charged outside the monthly billing date (immediate debit). */
   offCycle?: boolean;
   categoryId: string | null;
+  /** Who chose the category: the user, the classifier from a steady habit, or a guess. Absent = the user. */
+  by?: 'user' | 'learned' | 'guess';
+  /** For a guess: the known merchant or word it was based on. */
+  hint?: string;
 }
 
 export interface IncomeItem { id: string; label: string; amount: number }
@@ -60,9 +68,6 @@ export interface ImportedFile {
   importedAt: string;
 }
 
-export interface ChatMsg { role: 'user' | 'assistant'; content: string }
-export interface AiState { summary?: string; summaryAt?: string; chat: ChatMsg[] }
-
 export interface Goal { incomes: IncomeItem[]; split: Split; setAt: string }
 
 export interface MonthData {
@@ -72,7 +77,6 @@ export interface MonthData {
   files: ImportedFile[];
   txs: Tx[];
   manual: ManualItem[];
-  ai: AiState;
   analyzedAt?: string;
 }
 
@@ -80,17 +84,13 @@ export interface Settings {
   lang: Lang;
   theme: Theme;
   split: Split;
-  aiProvider: 'auto' | 'claude-code' | 'api';
-  aiModel: string;
 }
 
 export interface DB {
   version: 1;
   settings: Settings;
   categories: Category[];
-  /** Learned merchant → category, so next month's statement classifies itself. */
+  /** Merchant → category remembered by earlier versions. Read by the classifier (learn.ts), no longer written. */
   merchantRules: Record<string, string>;
   months: Record<string, MonthData>;
-  /** AI conversations for multi-month analyses, keyed by the joined month keys. */
-  trendAi: Record<string, AiState>;
 }

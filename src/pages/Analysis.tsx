@@ -7,10 +7,8 @@ import { bucketName, categoryName, emptyMonth, useL, useLang, useStore } from '.
 import { currentMonth, dayLabel, isMonthKey, monthLabel, pct, shiftMonth } from '../lib/format';
 import { analyzeMonth, previousAnalysis } from '../lib/analysis/compute';
 import { buildInsights, type Tone } from '../lib/analysis/insights';
-import { monthContext } from '../lib/ai';
 import { BUCKET_COLOR, Button, Card, CardTitle, Dot, Empty, Money, MonthSwitcher, PageHeader, Pill, Segmented, TextInput, cx } from '../components/ui';
 import { BucketMeters, DailyChart, Donut, RankBars } from '../components/charts';
-import { AiPanel } from '../components/AiPanel';
 
 const TONE_ICON: Record<Tone, React.ReactNode> = {
   good: <CircleCheck size={18} className="text-good" />, warn: <TriangleAlert size={18} className="text-warn" />,
@@ -33,14 +31,13 @@ export default function AnalysisPage() {
   const L = useL();
   const lang = useLang();
   const db = useStore((s) => s.db);
-  const { setMonthAi, assign } = useStore();
+  const { assign } = useStore();
   const key = isMonthKey(month) ? month : shiftMonth(currentMonth(), -1);
   const m = db.months[key] ?? emptyMonth(key);
 
   const a = useMemo(() => analyzeMonth(m, db), [m, db]);
   const prev = useMemo(() => previousAnalysis(key, db), [key, db]);
   const insights = useMemo(() => buildInsights(a, prev, lang), [a, prev, lang]);
-  const context = useMemo(() => monthContext(m, db, lang), [m, db, lang]);
   const [merchantTab, setMerchantTab] = useState<'all' | SpendBucket>('all');
   const [query, setQuery] = useState('');
   const [showAll, setShowAll] = useState(false);
@@ -102,7 +99,7 @@ export default function AnalysisPage() {
           <CardTitle>{L('לאן הלך הכסף', 'Where the money went')}</CardTitle>
           <div className="flex flex-col items-center gap-4">
             <Donut size={180}
-              slices={[...SPEND_BUCKETS.map((b) => ({ id: b, label: bucketName(b, lang), value: a.spent[b], color: BUCKET_COLOR[b] })),
+              slices={[...(['needs', 'wants'] as const).map((b) => ({ id: b, label: bucketName(b, lang), value: a.spent[b], color: BUCKET_COLOR[b] })),
                 { id: 'un', label: L('לא מסווג', 'Unclassified'), value: a.unclassified.total, color: 'var(--neutral-mark)' }]}
               center={<><span className="text-xs text-muted">{L('הוצאות', 'Spent')}</span><Money value={a.totalSpent} className="text-xl font-bold" /></>} />
             <ul className="w-full space-y-1.5 text-sm">
@@ -136,17 +133,6 @@ export default function AnalysisPage() {
           ))}
         </ul>
       </Card>
-
-      <AiPanel context={context} ai={m.ai ?? { chat: [] }} onChange={(fn) => setMonthAi(key, fn)}
-        summaryPrompt={L(
-          `נתח את ${monthLabel(key, 'he')}. פתח במשפט אחד שמסכם את החודש. אחר כך: (1) עמידה ביעדים — צרכים, רצונות, חיסכון; (2) שלושת הדברים שהכי בלטו; (3) איפה אפשר לצמצם — הצעות קונקרטיות עם סכומי חיסכון משוערים לחודש; (4) צעד אחד לחודש הבא. קצר וענייני.`,
-          `Analyze ${monthLabel(key, 'en')}. Open with one sentence that sums up the month. Then: (1) performance against targets — needs, wants, savings; (2) the three things that stood out most; (3) where to cut — concrete suggestions with estimated monthly savings; (4) one step for next month. Keep it short and to the point.`)}
-        suggestions={[
-          L('איפה הכי קל לי לחסוך ₪500 בחודש?', 'Where could I most easily save ₪500 a month?'),
-          L('על אילו מנויים כדאי לוותר?', 'Which subscriptions should I drop?'),
-          L('כמה הוצאתי על אוכל בחוץ?', 'How much did I spend eating out?'),
-          L('יש חיובים חריגים או כפולים?', 'Any unusual or duplicate charges?'),
-        ]} />
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>

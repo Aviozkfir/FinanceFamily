@@ -47,7 +47,7 @@ export function buildForecast(analyses: MonthAnalysis[], db: DB): Forecast | nul
   const incomes = months.map((m) => m.income).filter((v) => v > 0);
 
   const lastMonth = db.months[last.key];
-  const ignore = new Set(db.categories.filter((c) => c.bucket === 'ignore').map((c) => c.id));
+  const ignore = new Set(db.categories.filter((c) => c.bucket === 'ignore' || c.bucket === 'invest').map((c) => c.id));
   const counted = (lastMonth?.txs ?? []).filter((t) => !t.categoryId || !ignore.has(t.categoryId));
   const installments = counted
     .filter((t) => t.installment && t.installment.n < t.installment.of)
@@ -58,7 +58,7 @@ export function buildForecast(analyses: MonthAnalysis[], db: DB): Forecast | nul
     month: shiftMonth(last.key, 1),
     basedOn: months.map((m) => m.key),
     byBucket,
-    total: SPEND_BUCKETS.reduce((s, b) => s + byBucket[b].expected, 0) + unclassified,
+    total: byBucket.needs.expected + byBucket.wants.expected + unclassified,
     income: incomes.length ? weightedAvg(incomes) : 0,
     committed: { installments, standing, total: [...installments, ...standing].reduce((s, x) => s + x.amount, 0) },
     trend: months.length >= 3 ? slope(months.map((m) => m.totalSpent)) : null,

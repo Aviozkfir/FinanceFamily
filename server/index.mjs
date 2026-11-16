@@ -1,14 +1,12 @@
-// Local-only server: stores the data file on disk and proxies the AI assistant.
+// Local-only server: stores the data file on disk.
 import express from 'express';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cliStatus, streamAnswer, DEFAULT_API_MODEL } from './ai.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const dataDir = path.join(root, 'data');
 const dbFile = path.join(dataDir, 'db.json');
-const secretsFile = path.join(dataDir, 'secrets.json');
 const backupDir = path.join(dataDir, 'backups');
 const isProd = process.argv.includes('--prod');
 const PORT = Number(process.env.PORT) || 5174;
@@ -53,53 +51,6 @@ app.put('/api/db', (req, res) => {
   dailyBackup();
   writeJsonAtomic(dbFile, req.body);
   res.json({ ok: true });
-});
-
-app.get('/api/ai/status', async (_req, res) => {
-  const cli = await cliStatus();
-  const secrets = readJson(secretsFile, {});
-  res.json({
-    cli: cli.available,
-    cliVersion: cli.version ?? null,
-    hasApiKey: Boolean(secrets.apiKey || process.env.ANTHROPIC_API_KEY),
-    defaultModel: DEFAULT_API_MODEL,
-  });
-});
-
-app.post('/api/ai/key', (req, res) => {
-  const key = String(req.body?.apiKey ?? '').trim();
-  const secrets = readJson(secretsFile, {});
-  if (key) secrets.apiKey = key; else delete secrets.apiKey;
-  writeJsonAtomic(secretsFile, secrets);
-  res.json({ ok: true, hasApiKey: Boolean(secrets.apiKey || process.env.ANTHROPIC_API_KEY) });
-});
-
-// Streams newline-delimited JSON: {t:'d',v:text} … then {t:'done'} or {t:'e',v:code}.
-app.post('/api/ai/chat', async (req, res) => {
-  const { context = '', lang = 'he', messages = [], provider = 'auto', model = '' } = req.body ?? {};
-  if (!Array.isArray(messages) || !messages.length) return res.status(400).json({ error: 'no messages' });
-
-  const secrets = readJson(secretsFile, {});
-  let chosen = provider;
-  if (chosen === 'auto') chosen = (await cliStatus()).available ? 'claude-code' : 'api';
-
-  res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('X-Accel-Buffering', 'no');
-  const send = (obj) => res.write(JSON.stringify(obj) + '\n');
-  const abort = new AbortController();
-  res.on('close', () => { if (!res.writableEnded) abort.abort(); });
-
-  try {
-    await streamAnswer(
-      { provider: chosen, context, lang, messages, model: model || undefined, apiKey: secrets.apiKey, signal: abort.signal },
-      (text) => send({ t: 'd', v: text }),
-    );
-    send({ t: 'done', provider: chosen });
-  } catch (err) {
-    send({ t: 'e', v: String(err?.message || err), provider: chosen });
-  }
-  res.end();
 });
 
 if (isProd) {

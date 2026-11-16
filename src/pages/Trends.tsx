@@ -5,16 +5,13 @@ import { SPEND_BUCKETS } from '../lib/types';
 import { bucketName, useL, useLang, useStore } from '../lib/store';
 import { merchantKey, monthLabel, pct } from '../lib/format';
 import { analyzeMany, buildForecast } from '../lib/analysis/forecast';
-import { trendContext } from '../lib/ai';
 import { BUCKET_COLOR, Card, CardTitle, Dot, Empty, Money, PageHeader, cx } from '../components/ui';
 import { MonthsChart, RankBars } from '../components/charts';
-import { AiPanel } from '../components/AiPanel';
 
 export default function TrendsPage() {
   const L = useL();
   const lang = useLang();
   const db = useStore((s) => s.db);
-  const setTrendAi = useStore((s) => s.setTrendAi);
   const [params, setParams] = useSearchParams();
 
   const available = useMemo(() => Object.values(db.months).filter((m) => m.txs.length || m.manual.length).map((m) => m.key).sort(), [db.months]);
@@ -22,8 +19,6 @@ export default function TrendsPage() {
   const keys = requested.length ? requested : available.slice(-12);
   const analyses = useMemo(() => analyzeMany(keys, db), [keys.join(','), db]); // eslint-disable-line react-hooks/exhaustive-deps
   const forecast = useMemo(() => buildForecast(analyses, db), [analyses, db]);
-  const context = useMemo(() => trendContext(analyses, forecast, db, lang), [analyses, forecast, db, lang]);
-  const aiKey = keys.join(',');
 
   if (!available.length) {
     return (
@@ -174,16 +169,6 @@ export default function TrendsPage() {
         <CardTitle hint={L('סך הכול על פני החודשים שנבחרו', 'Total across the selected months')}>{L('בתי העסק המובילים', 'Top merchants')}</CardTitle>
         <RankBars lang={lang} rows={topMerchants.map((m) => ({ key: m.name, label: m.name, sub: n > 1 ? L(`${m.months} חודשים`, `${m.months} mo`) : undefined, value: m.total, color: BUCKET_COLOR[m.bucket ?? 'none'] }))} />
       </Card>
-
-      <AiPanel key={aiKey} context={context} ai={db.trendAi[aiKey] ?? { chat: [] }} onChange={(fn) => setTrendAi(aiKey, fn)}
-        summaryPrompt={L(
-          `נתח את ${n > 1 ? `${n} החודשים` : 'החודש'} שבנתונים יחד. (1) המגמה הכללית בהכנסות, בהוצאות ובחיסכון; (2) מה חוזר על עצמו מחודש לחודש ומה השתנה; (3) תחזית לחודש הבא ועל מה היא נשענת; (4) שלוש המלצות קונקרטיות עם השפעה משוערת בשקלים. קצר וענייני.`,
-          `Analyze the ${n > 1 ? `${n} months` : 'month'} in the data together. (1) The overall trend in income, spending and savings; (2) what repeats month to month and what changed; (3) a forecast for next month and what it rests on; (4) three concrete recommendations with estimated impact in shekels. Keep it short and to the point.`)}
-        suggestions={[
-          L('איזו קטגוריה גדלה הכי הרבה?', 'Which category grew the most?'),
-          L('כמה אחסוך בשנה אם אמשיך ככה?', 'How much will I save in a year at this pace?'),
-          L('מה יקרה אם אקצץ 15% ברצונות?', 'What happens if I cut wants by 15%?'),
-        ]} />
     </div>
   );
 }

@@ -75,5 +75,4 @@ After upgrading Capacitor itself (`@capacitor/*` in `package.json`), also commit
 ## How the phone version differs
 
 - There is no local server on the phone: data is stored on the device only.
-- The assistant needs an Anthropic API key (Settings). The Claude Code sign-in exists only on the computer.
 - To move data from the computer: Settings → Download backup on the computer, then Restore from backup on the phone.

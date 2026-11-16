@@ -1,7 +1,7 @@
 {
   "name": "finance-app",
   "private": true,
-  "version": "1.1.1",
+  "version": "1.2.0",
   "type": "module",
   "scripts": {
     "dev": "concurrently -k -n api,web -c blue,green \"node server/index.mjs\" \"vite\"",
@@ -12,7 +12,6 @@
     "apk": "node deploy/scripts/build-apk.mjs"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^1.8.0",
     "@capacitor/android": "^8.6.2",
     "@capacitor/core": "^8.6.2",
     "@dnd-kit/core": "^6.3.1",
@@ -21,9 +20,7 @@
     "lucide-react": "^1.73.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "react-markdown": "^10.1.0",
     "react-router-dom": "^7.18.5",
-    "remark-gfm": "^4.0.1",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zustand": "^5.1.0"
   },

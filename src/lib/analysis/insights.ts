@@ -22,6 +22,15 @@ export function buildInsights(a: MonthAnalysis, prev: MonthAnalysis | null, lang
     });
   }
 
+  if (a.guessed.count) {
+    out.push({
+      id: 'guessed', tone: 'warn',
+      title: L(`${a.guessed.count} עסקאות סווגו לפי ניחוש`, `${a.guessed.count} transactions were classified by a guess`),
+      body: L(`${$(a.guessed.total)} שויכו אוטומטית ועדיין לא אישרת. עבור עליהן בלוח הסיווג כדי שהמספרים יהיו מדויקים.`,
+        `${$(a.guessed.total)} was placed automatically and not confirmed yet. Review it on the classification board so the numbers are exact.`),
+    });
+  }
+
   if (a.basis !== 'none') {
     // Overall balance
     if (a.income > 0) {
@@ -29,8 +38,8 @@ export function buildInsights(a: MonthAnalysis, prev: MonthAnalysis | null, lang
         ? {
           id: 'balance', tone: 'good',
           title: L(`סיימת את החודש עם עודף של ${$(a.leftover)}`, `You finished the month ${$(a.leftover)} ahead`),
-          body: L(`הוצאת ${pct(a.totalSpent / a.income)} מההכנסה. שיעור החיסכון הכולל (חיסכון + מה שנשאר): ${pct(a.savingsRate ?? 0)}.`,
-            `You spent ${pct(a.totalSpent / a.income)} of your income. Total savings rate (savings + what was left): ${pct(a.savingsRate ?? 0)}.`),
+          body: L(`הוצאת ${pct(a.totalSpent / a.income)} מההכנסה, וחסכת ${pct(a.savingsRate ?? 0)} ממנה.`,
+            `You spent ${pct(a.totalSpent / a.income)} of your income and saved ${pct(a.savingsRate ?? 0)} of it.`),
         }
         : {
           id: 'balance', tone: 'bad',
@@ -62,22 +71,23 @@ export function buildInsights(a: MonthAnalysis, prev: MonthAnalysis | null, lang
       }
     }
 
-    // Savings: explicit + leftover vs the 20% target
+    // Savings: what was left of the income, against the target
     if (a.income > 0 && a.target.invest > 0) {
-      const saved = a.spent.invest + Math.max(a.leftover, 0);
+      const saved = Math.max(a.leftover, 0);
       const gap = a.target.invest - saved;
+      const aside = a.setAside > 0 ? L(` מתוכם ${$(a.setAside)} כבר סומנו כהפקדה.`, ` ${$(a.setAside)} of it is already marked as deposited.`) : '';
       out.push(gap > 0
         ? {
           id: 'savings', tone: 'warn',
           title: L(`חסרים ${$(gap)} כדי להגיע ליעד החיסכון`, `${$(gap)} short of the savings target`),
-          body: L(`היעד הוא ${$(a.target.invest)} (${a.split.invest}%). בפועל הופרשו ${$(a.spent.invest)} ונשארו ${$(Math.max(a.leftover, 0))} פנויים.`,
-            `The target is ${$(a.target.invest)} (${a.split.invest}%). You set aside ${$(a.spent.invest)} and had ${$(Math.max(a.leftover, 0))} left over.`),
+          body: L(`היעד הוא ${$(a.target.invest)} (${a.split.invest}%). אחרי ההוצאות נשארו ${$(saved)}.${aside}`,
+            `The target is ${$(a.target.invest)} (${a.split.invest}%). After spending, ${$(saved)} was left.${aside}`),
         }
         : {
           id: 'savings', tone: 'good',
           title: L('עמדת ביעד החיסכון', 'You met the savings target'),
-          body: L(`בין החיסכון שסומן (${$(a.spent.invest)}) לעודף (${$(Math.max(a.leftover, 0))}) יש לך ${$(saved)} — מעל היעד של ${$(a.target.invest)}.${a.leftover > 0 ? ' כדאי להעביר את העודף לחיסכון כדי שלא ייבלע.' : ''}`,
-            `Between marked savings (${$(a.spent.invest)}) and the surplus (${$(Math.max(a.leftover, 0))}) you have ${$(saved)} — above the ${$(a.target.invest)} target.${a.leftover > 0 ? ' Move the surplus into savings so it does not get absorbed.' : ''}`),
+          body: L(`אחרי ההוצאות נשארו ${$(saved)} — מעל היעד של ${$(a.target.invest)}.${aside}`,
+            `After spending, ${$(saved)} was left — above the ${$(a.target.invest)} target.${aside}`),
         });
     }
   }
@@ -146,7 +156,7 @@ export function buildInsights(a: MonthAnalysis, prev: MonthAnalysis | null, lang
     const diff = a.totalSpent - prev.totalSpent;
     const rel = diff / prev.totalSpent;
     if (Math.abs(rel) > 0.05) {
-      const moved = (['needs', 'wants', 'invest'] as SpendBucket[])
+      const moved = (['needs', 'wants'] as SpendBucket[])
         .map((b) => ({ b, d: a.spent[b] - prev.spent[b] }))
         .sort((x, y) => Math.abs(y.d) - Math.abs(x.d))[0];
       out.push({
