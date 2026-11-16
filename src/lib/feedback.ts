@@ -8,7 +8,7 @@ import { isNative } from './platform';
  * The public access key of the developer's Web3Forms form. It only allows sending to that form,
  * so it is safe in the code. While it is empty the feedback form is not shown.
  */
-const ACCESS_KEY = '';
+const ACCESS_KEY: string = 'b7ebf55f-786a-42d2-b648-413d321fb0f8';
 
 export const feedbackEnabled = () => ACCESS_KEY !== '';
 export type FeedbackKind = 'bug' | 'idea' | 'other';

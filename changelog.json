@@ -1,5 +1,15 @@
 [
   {
+    "version": "1.6.1",
+    "date": "2026-11-16",
+    "he": [
+      "משוב ודיווח על תקלה: בהגדרות אפשר לשלוח הודעה ישירות למפתח. נשלחים רק הטקסט, מספר הגרסה וסוג המכשיר."
+    ],
+    "en": [
+      "Feedback and bug reports: in Settings you can send a message straight to the developer. Only the text, the version number and the device type are sent."
+    ]
+  },
+  {
     "version": "1.6.0",
     "date": "2026-11-16",
     "he": [
