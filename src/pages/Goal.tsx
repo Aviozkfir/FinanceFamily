@@ -6,7 +6,6 @@ import { SPEND_BUCKETS } from '../lib/types';
 import { bucketName, sumItems, useL, useLang, useStore } from '../lib/store';
 import { isMonthKey, monthLabel, shiftMonth, statementMonth, uid } from '../lib/format';
 import { AmountInput, BUCKET_COLOR, Button, Card, CardTitle, Dot, IconButton, Money, MonthSwitcher, PageHeader, TextInput, cx } from '../components/ui';
-import { Donut } from '../components/charts';
 
 export function IncomeEditor({ items, onChange, placeholder }: { items: IncomeItem[]; onChange: (items: IncomeItem[]) => void; placeholder: string }) {
   const L = useL();
@@ -66,6 +65,7 @@ export default function GoalPage() {
   return (
     <div className="rise">
       <PageHeader title={L('יעד חודשי', 'Monthly goal')} subtitle={L('כמה צפוי להיכנס — וכמה מותר להוציא על כל דבר', 'What you expect to earn — and how much each bucket may take')}>
+        <Button onClick={() => navigate(`/month/${key}`)}>{L('לחודש עצמו', 'To the month itself')}</Button>
         <MonthSwitcher value={key} onChange={(k) => navigate(`/goal/${k}`)} />
       </PageHeader>
 
@@ -104,11 +104,14 @@ export default function GoalPage() {
         </div>
 
         <Card className="flex flex-col">
-          <CardTitle hint={monthLabel(key, lang)}>{L('העוגה שלך', 'Your cake')}</CardTitle>
+          <CardTitle hint={monthLabel(key, lang)}>{L('התוכנית שלך', 'Your plan')}</CardTitle>
           <div className="flex flex-1 flex-col items-center justify-center gap-6 py-2">
-            <Donut size={250}
-              slices={SPEND_BUCKETS.map((b) => ({ id: b, label: bucketName(b, lang), value: total > 0 ? (total * split[b]) / 100 : split[b], color: BUCKET_COLOR[b] }))}
-              center={<><span className="text-xs text-muted">{L('הכנסה צפויה', 'Expected income')}</span><Money value={total} className="text-3xl font-bold" /></>} />
+            <div className="w-full">
+              <p className="mb-3 flex items-baseline gap-2"><span className="text-sm text-ink2">{L('הכנסה צפויה', 'Expected income')}</span><Money value={total} className="text-3xl font-bold tracking-tight" /></p>
+              <div className="flex h-7 gap-0.5 overflow-hidden rounded-md">
+                {SPEND_BUCKETS.map((b) => split[b] > 0 && <div key={b} className="grow" title={`${bucketName(b, lang)} ${split[b]}%`} style={{ width: `${split[b]}%`, background: BUCKET_COLOR[b] }} />)}
+              </div>
+            </div>
             <div className="w-full space-y-2">
               {SPEND_BUCKETS.map((b) => (
                 <div key={b} className="flex items-center justify-between gap-3 rounded-2xl bg-surface2 px-4 py-3">

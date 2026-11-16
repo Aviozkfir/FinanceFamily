@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, BarChart3, Check, CreditCard, FileSpreadsheet, LayoutGrid, Plus, Target, Trash2, TriangleAlert, Upload, Repeat } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BarChart3, Check, CreditCard, FileSpreadsheet, LayoutGrid, Plus, Target, Trash2, TriangleAlert, Upload, Repeat, Pencil } from 'lucide-react';
 import type { ManualItem } from '../lib/types';
 import { SPEND_BUCKETS } from '../lib/types';
 import { bucketName, categoryName, emptyMonth, sumItems, useL, useLang, useStore } from '../lib/store';
@@ -44,6 +44,8 @@ export default function MonthPage() {
   // Standing orders reach a month the first time it is opened.
   useEffect(() => { applyRecurring(key); }, [key, applyRecurring]);
 
+  const [editing, setEditing] = useState(false);
+  useEffect(() => { setEditing(false); }, [key]);
   const fileInput = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -77,6 +79,8 @@ export default function MonthPage() {
   const goalIncome = m.goal ? sumItems(m.goal.incomes) : 0;
   const manualPatch = (id: string, p: Partial<ManualItem>) => setManual(key, m.manual.map((x) => (x.id === id ? { ...x, ...p } : x)));
   const canAnalyze = m.txs.length > 0 || m.manual.length > 0;
+  const complete = incomeTotal > 0 && m.txs.length > 0 && m.txs.every((t) => t.categoryId && sourceOf(t) !== 'guess');
+  const showSteps = editing || !complete;
 
   return (
     <div className="rise space-y-4">
@@ -100,6 +104,28 @@ export default function MonthPage() {
         </div>
       )}
 
+      {/* A finished month reads as a summary; the editors open on request. */}
+      {!showSteps && (
+        <Card>
+          <ul className="divide-y divide-line">
+            {[
+              [L('הכנסות', 'Income'), <Money key="i" value={incomeTotal} className="font-semibold" />],
+              [L('דפי חיוב', 'Statements'), <span key="f" className="font-semibold">{L(m.files.length === 1 ? 'קובץ אחד' : `${m.files.length} קבצים`, `${m.files.length} file${m.files.length === 1 ? '' : 's'}`)} · <Money value={m.files.reduce((t, f) => t + f.total, 0)} /></span>],
+              [L('סיווג', 'Classification'), <span key="c" className="font-semibold">{L(`כל ${m.txs.length} העסקאות סווגו`, `All ${m.txs.length} transactions classified`)}</span>],
+              [L('הכנסות והוצאות נוספות', 'Other income & expenses'), <span key="m" className="font-semibold">{m.manual.length ? L(m.manual.length === 1 ? 'שורה אחת' : `${m.manual.length} שורות`, `${m.manual.length} line${m.manual.length === 1 ? '' : 's'}`) : L('אין', 'None')}</span>],
+            ].map(([label, value], n) => (
+              <li key={n} className="flex items-center gap-3 py-3">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-good text-page"><Check size={14} strokeWidth={3} /></span>
+                <span className="me-auto text-sm text-ink2">{label}</span>
+                <span className="text-sm">{value}</span>
+              </li>
+            ))}
+          </ul>
+          <Button className="mt-3" icon={<Pencil size={15} />} onClick={() => setEditing(true)}>{L('עריכת החודש', 'Edit this month')}</Button>
+        </Card>
+      )}
+
+      {showSteps && <>
       <Step n={1} done={incomeTotal > 0} title={L('הכנסות בפועל', 'Actual income')} hint={L('מה באמת נכנס החודש', 'What actually came in this month')}
         action={incomeTotal > 0 ? <Money value={incomeTotal} className="text-lg font-bold" /> : undefined}>
         {!m.incomes.length && (m.goal || prevIncomes.length > 0) && (
@@ -219,10 +245,12 @@ export default function MonthPage() {
         </div>
       </Step>
 
-      <div className={cx('z-20 flex justify-center pt-2', canAnalyze && 'sticky bottom-20 lg:bottom-6')}>
-        <Button variant="primary" size="lg" disabled={!canAnalyze} className="shadow-2xl" icon={<BarChart3 size={18} />}
+      </>}
+
+      <div className="flex justify-center pt-2">
+        <Button variant="primary" size="lg" disabled={!canAnalyze} className="w-full sm:w-auto" icon={<BarChart3 size={18} />}
           onClick={() => { updateMonth(key, (x) => ({ ...x, analyzedAt: new Date().toISOString() })); navigate(`/month/${key}/analysis`); }}>
-          {L('נתח את החודש', 'Analyze this month')}<Arrow size={17} />
+          {complete && !editing ? L('לתמונה של החודש', 'See the picture of the month') : L('נתח את החודש', 'Analyze this month')}<Arrow size={17} />
         </Button>
       </div>
     </div>

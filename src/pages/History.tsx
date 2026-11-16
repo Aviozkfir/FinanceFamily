@@ -14,29 +14,16 @@ export default function HistoryPage() {
   const navigate = useNavigate();
   const db = useStore((s) => s.db);
   const deleteMonth = useStore((s) => s.deleteMonth);
-  const [picked, setPicked] = useState<Set<string>>(new Set());
   const [toDelete, setToDelete] = useState<string | null>(null);
 
   const months = Object.values(db.months)
     .filter((m) => m.txs.length || m.manual.length || m.incomes.length || m.goal)
     .sort((a, b) => b.key.localeCompare(a.key));
-  const analyzable = months.filter((m) => m.txs.length || m.manual.length);
-  const toggle = (k: string) => setPicked((s) => { const n = new Set(s); n.has(k) ? n.delete(k) : n.add(k); return n; });
 
   return (
     <div className="rise">
       <OverTimeTabs value="months" />
-      <PageHeader title={L('החודשים שלי', 'My months')} subtitle={L('כל החודשים שמילאת. סמן כמה חודשים כדי לנתח אותם יחד.', 'Every month you filled in. Select several to analyze them together.')}>
-        {analyzable.length > 1 && (
-          <Button onClick={() => setPicked(picked.size === analyzable.length ? new Set() : new Set(analyzable.map((m) => m.key)))}>
-            {picked.size === analyzable.length ? L('נקה בחירה', 'Clear selection') : L('בחר הכול', 'Select all')}
-          </Button>
-        )}
-        <Button variant="primary" icon={<TrendingUp size={16} />} disabled={picked.size < 1}
-          onClick={() => navigate(`/trends?m=${[...picked].sort().join(',')}`)}>
-          {picked.size > 1 ? L(`נתח ${picked.size} חודשים יחד`, `Analyze ${picked.size} months together`) : L('ניתוח משולב', 'Combined analysis')}
-        </Button>
-      </PageHeader>
+      <PageHeader title={L('החודשים שלי', 'My months')} subtitle={L('לחץ על חודש כדי לפתוח אותו.', 'Tap a month to open it.')} />
 
       {!months.length ? (
         <Empty icon={<HistoryIcon size={30} />} title={L('עדיין אין היסטוריה', 'No history yet')}>
@@ -47,16 +34,9 @@ export default function HistoryPage() {
           {months.map((m) => {
             const has = m.txs.length > 0 || m.manual.length > 0;
             const a = analyzeMonth(m, db);
-            const on = picked.has(m.key);
             return (
-              <li key={m.key} className={cx('rounded-2xl border bg-surface p-4 shadow-[var(--shadow)] transition-colors', on ? 'border-accent' : 'border-line')}>
+              <li key={m.key} className="rounded-2xl border border-line bg-surface p-4 shadow-[var(--shadow)]">
                 <div className="flex items-start gap-3">
-                  {has && (
-                    <button role="checkbox" aria-checked={on} aria-label={L('בחר לניתוח משולב', 'Select for combined analysis')} onClick={() => toggle(m.key)}
-                      className={cx('mt-1 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border', on ? 'border-accent bg-accent text-page' : 'border-line-strong')}>
-                      {on && <Check size={13} strokeWidth={3.5} />}
-                    </button>
-                  )}
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <Link to={has ? `/month/${m.key}/analysis` : m.goal ? `/goal/${m.key}` : `/month/${m.key}`} className="text-lg font-bold hover:underline">{monthLabel(m.key, lang)}</Link>
@@ -93,10 +73,10 @@ export default function HistoryPage() {
 
       {toDelete && (
         <Modal title={L(`למחוק את ${monthLabel(toDelete, lang)}?`, `Delete ${monthLabel(toDelete, lang)}?`)} onClose={() => setToDelete(null)}>
-          <p className="text-sm text-ink2">{L('היעד, ההכנסות, העסקאות והשיחות עם העוזר של החודש הזה יימחקו. אי אפשר לבטל את הפעולה.', 'The goal, income, transactions and assistant conversations for this month will be deleted. This cannot be undone.')}</p>
+          <p className="text-sm text-ink2">{L('היעד, ההכנסות והעסקאות של החודש הזה יימחקו. אי אפשר לבטל את הפעולה.', 'The goal, income, transactions and assistant conversations for this month will be deleted. This cannot be undone.')}</p>
           <div className="mt-6 flex justify-end gap-2">
             <Button onClick={() => setToDelete(null)}>{L('ביטול', 'Cancel')}</Button>
-            <Button variant="primary" className="!bg-bad !text-white" onClick={() => { deleteMonth(toDelete); setPicked((s) => { const n = new Set(s); n.delete(toDelete); return n; }); setToDelete(null); }}>{L('מחק חודש', 'Delete month')}</Button>
+            <Button variant="primary" className="!bg-bad !text-white" onClick={() => { deleteMonth(toDelete); setToDelete(null); }}>{L('מחק חודש', 'Delete month')}</Button>
           </div>
         </Modal>
       )}

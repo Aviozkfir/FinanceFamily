@@ -77,7 +77,7 @@ export default function TrendsPage() {
         ] as [string, React.ReactNode, number[]][]).map(([label, value, series], i) => (
           <Card key={i} className="!p-4"><p className="text-[13px] text-muted">{label}</p><p className="mt-1 text-2xl font-bold tracking-tight">{value}</p>
             {series.length > 1
-              ? <div className="mt-2" dir="ltr" title={L('מהחודש הראשון שנבחר עד האחרון', 'From the first selected month to the last')}><Sparkline values={series} /></div>
+              ? <div className="mt-2" title={L('מהחודש הראשון שנבחר עד האחרון', 'From the first selected month to the last')}><Sparkline values={series} /></div>
               : <p className="mt-0.5 text-xs text-muted">{L(`על פני ${n} חודשים`, `Across ${n} month${n > 1 ? 's' : ''}`)}</p>}</Card>
         ))}
       </div>
@@ -116,27 +116,15 @@ export default function TrendsPage() {
               {L('תחזית ל', 'Forecast for ')}{monthLabel(forecast.month, lang)}
             </CardTitle>
             <div className="space-y-3">
-              {SPEND_BUCKETS.map((b) => {
-                const f = forecast.byBucket[b];
-                return (
-                  <div key={b} className="flex items-center justify-between gap-3 rounded-2xl bg-surface2 px-4 py-3">
-                    <span className="flex items-center gap-2 font-medium"><Dot color={BUCKET_COLOR[b]} />{bucketName(b, lang)}</span>
-                    <span className="text-end"><Money value={f.expected} className="text-lg font-bold" />
-                      {n > 1 && <span className="block text-xs text-muted">{L('טווח', 'Range')} <Money value={f.low} />–<Money value={f.high} /></span>}</span>
-                  </div>
-                );
-              })}
-              <div className="flex items-center justify-between border-t border-line px-1 pt-3">
-                <span className="text-sm text-muted">{L('סך הוצאות צפוי', 'Expected total spending')}</span><Money value={forecast.total} className="text-xl font-bold" />
-              </div>
-              {forecast.income > 0 && (
-                <p className={cx('text-sm', forecast.income - forecast.total >= 0 ? 'text-good' : 'text-bad')}>
-                  {forecast.income - forecast.total >= 0
-                    ? L('בהכנסה דומה צפוי להישאר לך ', 'With similar income you should have ')
-                    : L('בהכנסה דומה צפוי גירעון של ', 'With similar income, expect a deficit of ')}
-                  <Money value={Math.abs(forecast.income - forecast.total)} className="font-bold" />{forecast.income - forecast.total >= 0 ? L('', ' left') : ''}
-                </p>
-              )}
+              <p className="text-[15px]">
+                {L('הוצאות צפויות: בערך ', 'Expected spending: about ')}<Money value={forecast.total} className="font-bold" />
+                {forecast.income > 0 && (forecast.income - forecast.total >= 0
+                  ? <>{L(', כך שיישארו בערך ', ', leaving about ')}<Money value={forecast.income - forecast.total} className="font-bold" />{L(' לחיסכון.', ' to save.')}</>
+                  : <>{L(', כלומר גירעון של בערך ', ', a deficit of about ')}<Money value={forecast.total - forecast.income} className="font-bold text-bad" />.</>)}
+              </p>
+              <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-ink2">
+                {(['needs', 'wants'] as const).map((b) => <span key={b} className="flex items-center gap-1.5"><Dot color={BUCKET_COLOR[b]} />{bucketName(b, lang)} <Money value={forecast.byBucket[b].expected} className="font-semibold text-ink" /></span>)}
+              </p>
               {forecast.trend != null && Math.abs(forecast.trend) > 50 && (
                 <p className="flex items-center gap-2 text-sm text-ink2">
                   {forecast.trend > 0 ? <TrendingUp size={16} className="text-bad" /> : <TrendingDown size={16} className="text-good" />}

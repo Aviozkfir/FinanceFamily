@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { DndContext, DragOverlay, MouseSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
-import { ArrowLeftRight, Check, CheckCheck, Globe, Layers, Pencil, Plus, Repeat, Search, Sparkles, Trash2, Wand2, X } from 'lucide-react';
+import { ArrowLeftRight, Check, CheckCheck, Globe, Layers, Pencil, Plus, Repeat, Search, Sparkles, Trash2, Wand2, SlidersHorizontal, X } from 'lucide-react';
 import type { BucketId, Category, Tx } from '../lib/types';
 import { bucketName, categoryName, emptyMonth, useL, useLang, useStore } from '../lib/store';
 import { dayLabel, isMonthKey, merchantKey, money, monthLabel } from '../lib/format';
@@ -86,6 +86,7 @@ export default function ClassifyPage() {
   const [dragId, setDragId] = useState<string | null>(null);
   const [catModal, setCatModal] = useState<{ id?: string; name: string; bucket: BucketId } | null>(null);
   const [onlyGuesses, setOnlyGuesses] = useState(false);
+  const [tools, setTools] = useState(false);
   const [toast, setToast] = useState('');
 
   const sensors = useSensors(useSensor(MouseSensor, { activationConstraint: { distance: 6 } }), useSensor(TouchSensor, { activationConstraint: { delay: 160, tolerance: 8 } }));
@@ -145,19 +146,25 @@ export default function ClassifyPage() {
   return (
     <DndContext sensors={sensors} onDragStart={(e) => setDragId(String(e.active.id))} onDragEnd={onDragEnd} onDragCancel={() => setDragId(null)}>
       <div className="flex h-dvh flex-col">
-        {/* Top bar */}
-        <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line bg-surface px-4 py-3">
-          <div className="me-auto min-w-0">
-            <h1 className="truncate text-lg font-bold">{L('סיווג עסקאות', 'Classify transactions')} · {monthLabel(key, lang)}</h1>
-            <p className="text-[13px] text-muted">{L(`${classifiedCount} מתוך ${m.txs.length} סווגו`, `${classifiedCount} of ${m.txs.length} classified`)} · {L('גרור בועה, או לחץ עליה כדי לבחור', 'Drag a bubble, or tap it to select')}</p>
+        {/* Top bar: what this is, how far along, and the way out. Search and grouping sit behind one icon. */}
+        <header className="border-b border-line bg-surface px-4 py-2.5">
+          <div className="flex items-center gap-2">
+            <div className="me-auto min-w-0">
+              <h1 className="truncate text-base font-bold">{L('סיווג', 'Classify')} · {monthLabel(key, lang)}</h1>
+              <p className="text-[13px] text-muted">{L(`${classifiedCount} מתוך ${m.txs.length} סווגו`, `${classifiedCount} of ${m.txs.length} classified`)}</p>
+            </div>
+            <IconButton label={L('חיפוש ואפשרויות', 'Search and options')} aria-expanded={tools} onClick={() => setTools(!tools)} className={tools || query ? '!bg-surface2 !text-accent' : ''}><SlidersHorizontal size={17} /></IconButton>
+            <Button size="sm" variant="primary" icon={<Check size={15} />} onClick={() => navigate(`/month/${key}`)}>{L('סיום', 'Done')}</Button>
           </div>
-          <div className="relative">
-            <Search size={15} className="pointer-events-none absolute inset-y-0 start-3 my-auto text-muted" />
-            <TextInput value={query} onChange={(e) => setQuery(e.target.value)} placeholder={L('חיפוש בית עסק', 'Search merchant')} className="!h-9 w-44 !ps-9" />
-          </div>
-          <Button size="sm" variant={grouped ? 'soft' : 'ghost'} icon={<Layers size={15} />} onClick={() => setGrouped(!grouped)} aria-pressed={grouped}>{L('קבץ לפי בית עסק', 'Group by merchant')}</Button>
-          <Button size="sm" icon={<Wand2 size={15} />} onClick={autoClassify} disabled={!pool.length}>{L('הצע סיווג', 'Suggest')}</Button>
-          <Button size="sm" variant="primary" icon={<Check size={15} />} onClick={() => navigate(`/month/${key}`)}>{L('שמור וסיים', 'Save & finish')}</Button>
+          {tools && (
+            <div className="rise mt-2.5 flex flex-wrap items-center gap-2">
+              <div className="relative min-w-40 flex-1">
+                <Search size={15} className="pointer-events-none absolute inset-y-0 start-3 my-auto text-muted" />
+                <TextInput autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder={L('חיפוש בית עסק', 'Search merchant')} className="!h-9 !ps-9" />
+              </div>
+              <Button size="sm" variant={grouped ? 'soft' : 'ghost'} icon={<Layers size={15} />} onClick={() => setGrouped(!grouped)} aria-pressed={grouped}>{L('קבץ לפי בית עסק', 'Group by merchant')}</Button>
+            </div>
+          )}
         </header>
 
         {/* What the app decided by itself, and how sure it is */}
@@ -172,28 +179,25 @@ export default function ClassifyPage() {
           <p className="flex items-center gap-1.5 border-b border-line bg-surface2 px-4 py-2 text-[13px] text-muted"><Sparkles size={13} />{L('מסומן כך: סווג לבד, לפי מה שבחרת בעבר', 'Marked like this: classified automatically, from what you chose before')}</p>
         ) : null}
 
-        <div className="grid min-h-0 flex-1 grid-rows-[minmax(0,2fr)_minmax(0,3fr)] lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:grid-rows-1">
+        {/* On a phone the whole board is one scroll, with what is still waiting pinned on top as a short strip.
+            On a wide screen the two sit side by side, each scrolling by itself. */}
+        <div className="min-h-0 flex-1 overflow-y-auto lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:overflow-hidden">
           {/* Pool */}
-          <Zone id="pool" className="overflow-y-auto border-b border-line bg-page p-4 lg:border-b-0 lg:border-e">
-            <div className="mb-3 flex items-center justify-between">
-              <h2 className="flex items-center gap-2 font-semibold"><Dot color="var(--neutral-mark)" />{L('ממתינות לסיווג', 'Waiting to be classified')}</h2>
-              <span className="text-sm text-muted">{pool.length} · <Money value={pool.reduce((s, i) => s + i.amount, 0)} /></span>
+          <Zone id="pool" className="sticky top-0 z-10 max-h-[34dvh] overflow-y-auto border-b border-line bg-page px-4 py-3 lg:static lg:max-h-none lg:border-b-0 lg:border-e lg:p-4">
+            <div className={cx('flex items-center justify-between', pool.length > 0 && 'mb-2.5')}>
+              <h2 className="flex items-center gap-2 text-sm font-semibold">{pool.length ? <Dot color="var(--neutral-mark)" /> : <Check size={16} className="text-good" strokeWidth={3} />}{pool.length ? L('ממתינות לסיווג', 'Waiting to be classified') : m.txs.length ? L('הכול מסווג', 'Everything is classified') : L('אין עסקאות בחודש הזה', 'No transactions this month')}</h2>
+              {pool.length > 0 && <span className="flex items-center gap-2 text-sm text-muted">{pool.length} · <Money value={pool.reduce((s, i) => s + i.amount, 0)} />
+                <IconButton label={L('הצע סיווג', 'Suggest a category')} className="!h-8 !w-8" onClick={autoClassify}><Wand2 size={15} /></IconButton></span>}
             </div>
             {pool.length ? (
               <div className="flex flex-wrap gap-2">
                 {pool.filter(match).map((i) => <Bubble key={i.id} item={i} color="transparent" selected={selected.has(i.id)} onToggle={() => toggle(i.id)} />)}
               </div>
-            ) : (
-              <div className="flex h-3/4 flex-col items-center justify-center text-center">
-                <span className="mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-good text-page"><Check size={26} strokeWidth={3} /></span>
-                <p className="font-semibold">{m.txs.length ? L('הכול מסווג!', 'Everything is classified!') : L('אין עסקאות בחודש הזה', 'No transactions this month')}</p>
-                <p className="mt-1 text-sm text-muted">{L('אפשר לגרור בועות בין הקטגוריות, או חזרה לכאן.', 'You can still drag bubbles between categories, or back here.')}</p>
-              </div>
-            )}
+            ) : null}
           </Zone>
 
           {/* Categories */}
-          <div className="overflow-y-auto p-4">
+          <div className="p-4 pb-28 lg:overflow-y-auto lg:pb-4">
             <div className="grid gap-3 sm:grid-cols-2">
               {cats.map((c, idx) => {
                 const inCat = items.filter((i) => i.categoryId === c.id);

@@ -169,7 +169,8 @@ export function DailyChart({ daily }: { daily: { date: string; total: number }[]
     <div ref={tip.ref} className="relative" dir="ltr">
       <svg viewBox={`0 0 ${W} ${H + padB}`} className="w-full" role="img" aria-label={lang === 'he' ? 'הוצאות לפי יום' : 'Spending by day'}>
         <Axis max={max} step={step} h={H} w={W} padL={padL} />
-        {data.map((d, i) => {
+        {data.map((d, n) => {
+          const i = lang === 'he' ? data.length - 1 - n : n;
           const x = padL + slot * i + (slot - bw) / 2;
           const h = (d.total / max) * H;
           return (
@@ -177,7 +178,7 @@ export function DailyChart({ daily }: { daily: { date: string; total: number }[]
               <path d={column(x, H - h, bw, h, 4)} fill="var(--accent)" />
               <rect x={padL + slot * i} y={0} width={slot} height={H} fill="transparent"
                 onMouseMove={(e) => tip.show(e, <TipRow label={dayLabel(d.date, lang)} value={money(d.total, lang)} />)} onMouseLeave={tip.hide} />
-              {i % every === 0 && <text x={x + bw / 2} y={H + 16} textAnchor="middle" fontSize={11} fill="var(--muted)">{dayLabel(d.date, lang)}</text>}
+              {n % every === 0 && <text x={x + bw / 2} y={H + 16} textAnchor="middle" fontSize={11} fill="var(--muted)">{dayLabel(d.date, lang)}</text>}
             </g>
           );
         })}
@@ -226,7 +227,9 @@ export function MonthsChart({ analyses, forecast }: { analyses: MonthAnalysis[];
       <div dir="ltr">
         <svg viewBox={`0 0 ${W} ${H + padB}`} className="w-full" role="img" aria-label={L('הוצאות לפי חודש', 'Spending by month')}>
           <Axis max={max} step={step} h={H} w={W} padL={padL} />
-          {cols.map((c, i) => {
+          {cols.map((c, n) => {
+            // Time runs the way the language reads: right to left in Hebrew.
+            const i = lang === 'he' ? cols.length - 1 - n : n;
             const x = padL + slot * i + (slot - bw) / 2;
             const parts = [...SPEND_BUCKETS.map((b) => ({ v: c.values[b], color: BUCKET_COLOR[b] })), { v: c.other, color: 'var(--neutral-mark)' }].filter((p) => p.v > 0);
             let y = H;
@@ -336,11 +339,14 @@ export function MonthPicture({ a, legend }: { a: MonthAnalysis; legend?: boolean
 
 // ---------- sparkline: how one figure moved over the months ----------
 /** A small line with no axes. The line is quiet; the last point, the current value, is marked. */
-export function Sparkline({ values, width = 120, height = 32 }: { values: number[]; width?: number; height?: number }) {
-  if (values.length < 2) return null;
+export function Sparkline({ values: inOrder, width = 120, height = 32 }: { values: number[]; width?: number; height?: number }) {
+  const lang = useLang();
+  if (inOrder.length < 2) return null;
+  // Oldest first in reading order, so the marked current value sits at the reading end.
+  const values = lang === 'he' ? [...inOrder].reverse() : inOrder;
   const min = Math.min(...values), max = Math.max(...values), span = max - min || 1, pad = 4;
   const pts = values.map((v, i) => [pad + (i / (values.length - 1)) * (width - pad * 2), pad + (1 - (v - min) / span) * (height - pad * 2)] as const);
-  const [lx, ly] = pts[pts.length - 1];
+  const [lx, ly] = pts[lang === 'he' ? 0 : pts.length - 1];
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} aria-hidden className="max-w-full overflow-visible">
       <polyline points={pts.map((p) => p.join(',')).join(' ')} fill="none" stroke="var(--neutral-mark)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />

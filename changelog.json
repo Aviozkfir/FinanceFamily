@@ -1,5 +1,23 @@
 [
   {
+    "version": "1.8.0",
+    "date": "2026-11-16",
+    "he": [
+      "חודש שהושלם נפתח כסיכום קצר עם אפשרות עריכה, וכפתור הניתוח כבר לא מרחף מעל המסך.",
+      "לוח הסיווג: סרגל עליון קצר, גלילה אחת, והעסקאות שמחכות נשארות מוצמדות למעלה.",
+      "מסך היעד מציג את התוכנית באותו פס שמופיע בניתוח, עם קישור חזרה לחודש.",
+      "התחזית במגמות מסוכמת בשורה אחת, ולחיצה על חודש ברשימה פותחת אותו.",
+      "בעברית הגרפים לאורך זמן נקראים מימין לשמאל."
+    ],
+    "en": [
+      "A finished month opens as a short summary with an Edit option, and the Analyze button no longer floats over the screen.",
+      "Classification board: a short top bar, one scroll, and the waiting transactions stay pinned at the top.",
+      "The goal screen shows the plan as the same bar used in the analysis, with a link back to the month.",
+      "The forecast in trends is summed up in one line, and tapping a month in the list opens it.",
+      "In Hebrew, charts over time read right to left."
+    ]
+  },
+  {
     "version": "1.7.0",
     "date": "2026-11-16",
     "he": [
