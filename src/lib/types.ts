@@ -16,7 +16,10 @@ export interface Category {
   name: string;
   /** Which bucket this category counts toward in the 50/30/20 analysis. */
   bucket: BucketId;
+  /** The four basic ones: needs, wants, savings, don't count. */
   builtin?: boolean;
+  /** A ready-made category (presets.ts). Shown under its translated name while `name` is empty. */
+  preset?: string;
 }
 
 export interface Tx {
@@ -53,6 +56,19 @@ export interface ManualItem {
   label: string;
   amount: number;
   categoryId: string | null;
+  /** Set when this line comes from a standing order: the id of its entry in DB.recurring. */
+  repeat?: string;
+}
+
+/** Something that happens every month outside the card: rent, a bank standing order, a salary. */
+export interface Recurring {
+  id: string;
+  kind: 'income' | 'expense';
+  label: string;
+  amount: number;
+  categoryId: string | null;
+  /** The first month it applies to, YYYY-MM. */
+  since: string;
 }
 
 export interface ImportedFile {
@@ -77,6 +93,8 @@ export interface MonthData {
   files: ImportedFile[];
   txs: Tx[];
   manual: ManualItem[];
+  /** Standing orders already copied into this month (so one the user deleted here does not come back). */
+  recurringApplied?: string[];
   analyzedAt?: string;
 }
 
@@ -84,6 +102,8 @@ export interface Settings {
   lang: Lang;
   theme: Theme;
   split: Split;
+  /** Day of the month the card is charged. The statement charged that day is the month's statement. */
+  billingDay: number;
 }
 
 export interface DB {
@@ -93,4 +113,8 @@ export interface DB {
   /** Merchant → category remembered by earlier versions. Read by the classifier (learn.ts), no longer written. */
   merchantRules: Record<string, string>;
   months: Record<string, MonthData>;
+  /** Standing orders: added to every month from `since` on. */
+  recurring: Recurring[];
+  /** Set once the ready-made categories were added, so deleting one does not bring it back. */
+  presetsAdded?: boolean;
 }

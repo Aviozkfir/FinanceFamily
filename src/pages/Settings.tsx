@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Download, RefreshCw, Trash2, Upload } from 'lucide-react';
 import type { BucketId, DB, Split } from '../lib/types';
 import { SPEND_BUCKETS } from '../lib/types';
-import { bucketName, useL, useLang, useStore } from '../lib/store';
+import { bucketName, categoryName, useL, useLang, useStore } from '../lib/store';
 import { isNative } from '../lib/platform';
 import { buildModel } from '../lib/learn';
 import { CURRENT, checkForUpdate, currentChannel, installUpdate, readSnapshot, setChannel, snapshotDate, useUpdate } from '../lib/update';
@@ -74,17 +74,22 @@ export default function SettingsPage() {
                 <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted">%</span></div></label>
           ))}
         </div>
+        <label className="mt-4 block max-w-xs"><span className="mb-1.5 block text-sm text-ink2">{L('יום החיוב של כרטיס האשראי', 'Day the card is charged')}</span>
+          <input type="number" min={1} max={28} dir="ltr" value={s.billingDay}
+            onChange={(e) => setSettings({ billingDay: Math.max(1, Math.min(28, Math.round(Number(e.target.value) || 10))) })}
+            className="num h-10 w-24 rounded-xl border border-line bg-surface2 px-3 text-sm font-semibold focus:border-accent focus:outline-none" />
+          <span className="mt-1 block text-xs text-muted">{L('חודש באפליקציה הוא דף החיוב שיורד ביום הזה. מהיום הזה והלאה האפליקציה מציעה לסכם את החודש הנוכחי.', 'A month in the app is the statement charged on this day. From this day on, the app offers to wrap up the current month.')}</span></label>
         {splitSum !== 100 && <p role="alert" className="mt-3 text-sm text-bad">{L(`החלוקה מסתכמת ב-${splitSum}% — היא תישמר כשתגיע ל-100%.`, `The split adds up to ${splitSum}% — it is saved once it totals 100%.`)}</p>}
       </Card>
 
       <Card>
-        <CardTitle hint={L('קטגוריות חדשות מוסיפים מלוח הסיווג', 'New categories are added from the classification board')}>{L('הקטגוריות שלי', 'My categories')}</CardTitle>
+        <CardTitle hint={L('אפשר לשנות שם, להעביר בין צרכים לרצונות או למחוק. קטגוריות חדשות מוסיפים מלוח הסיווג', 'Rename, move between needs and wants, or delete. New categories are added from the classification board')}>{L('קטגוריות', 'Categories')}</CardTitle>
         {custom.length ? (
           <ul className="space-y-2">
             {custom.map((c) => (
               <li key={c.id} className="flex flex-wrap items-center gap-2">
                 <Dot color={BUCKET_COLOR[c.bucket]} />
-                <TextInput value={c.name} onChange={(e) => updateCategory(c.id, { name: e.target.value })} className="min-w-32 flex-1" aria-label={L('שם הקטגוריה', 'Category name')} />
+                <TextInput value={c.name} placeholder={categoryName({ ...c, name: '' }, lang)} onChange={(e) => updateCategory(c.id, { name: e.target.value })} className="min-w-32 flex-1" aria-label={L('שם הקטגוריה', 'Category name')} />
                 <select value={c.bucket} onChange={(e) => updateCategory(c.id, { bucket: e.target.value as BucketId })} aria-label={L('נספר תחת', 'Counts as')}
                   className="h-10 rounded-xl border border-line bg-surface2 px-2 text-sm focus:border-accent focus:outline-none">
                   {(['needs', 'wants', ...(c.bucket === 'invest' ? ['invest'] : []), 'ignore'] as BucketId[]).map((b) => <option key={b} value={b}>{bucketName(b, lang)}</option>)}

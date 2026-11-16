@@ -14,7 +14,8 @@
 // itself into a mistake: only choices the user made or confirmed count.
 import type { DB, Tx } from './types';
 import { merchantKey } from './format';
-import { guessBucket } from './heuristics';
+import { guessPreset } from './heuristics';
+import { presetBucket, presetCategoryId } from './presets';
 
 /** Who decided a transaction's category. */
 export type Source = 'user' | 'learned' | 'guess';
@@ -116,6 +117,10 @@ export function suggest(model: Model, merchant: string): Suggestion | null {
   }
   if (word) return { categoryId: wordCat, by: 'guess', hint: word };
 
-  const builtin = guessBucket(merchant);
-  return builtin && model.valid.has(builtin) ? { categoryId: builtin, by: 'guess' } : null;
+  const preset = guessPreset(merchant);
+  if (!preset) return null;
+  // The ready-made category if the user still has it, otherwise plain needs / wants.
+  const ids = preset === 'ignore' ? ['ignore'] : [presetCategoryId(preset), presetBucket(preset)];
+  const categoryId = ids.find((id) => model.valid.has(id));
+  return categoryId ? { categoryId, by: 'guess' } : null;
 }

@@ -24,6 +24,14 @@ export const pct = (n: number, digits = 0) => `${(n * 100).toFixed(digits)}%`;
 // ----- months -----
 export const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 export const currentMonth = () => monthKey(new Date());
+/**
+ * The month whose card statement is the latest one out. The statement of a month is charged on
+ * the billing day, so before that day the latest statement is still last month's.
+ */
+export function statementMonth(billingDay: number, today = new Date()): string {
+  const now = monthKey(today);
+  return today.getDate() >= billingDay ? now : shiftMonth(now, -1);
+}
 export function shiftMonth(key: string, by: number): string {
   const [y, m] = key.split('-').map(Number);
   return monthKey(new Date(y, m - 1 + by, 1));

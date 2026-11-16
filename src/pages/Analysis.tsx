@@ -5,7 +5,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Check, ChevronDown, CircleAlert, CircleCheck, Info, Pencil, TriangleAlert } from 'lucide-react';
 import type { SpendBucket, Tx } from '../lib/types';
 import { bucketName, categoryName, emptyMonth, useL, useLang, useStore } from '../lib/store';
-import { currentMonth, dayLabel, isMonthKey, merchantKey, money, monthLabel, pct, shiftMonth } from '../lib/format';
+import { dayLabel, isMonthKey, merchantKey, money, monthLabel, pct, statementMonth } from '../lib/format';
 import { analyzeMonth, previousAnalysis } from '../lib/analysis/compute';
 import { buildInsights, topInsights, type Tone } from '../lib/analysis/insights';
 import { sourceOf } from '../lib/learn';
@@ -40,7 +40,7 @@ export default function AnalysisPage() {
   const lang = useLang();
   const db = useStore((s) => s.db);
   const { assign } = useStore();
-  const key = isMonthKey(month) ? month : shiftMonth(currentMonth(), -1);
+  const key = isMonthKey(month) ? month : statementMonth(db.settings.billingDay);
   const m = db.months[key] ?? emptyMonth(key);
 
   const a = useMemo(() => analyzeMonth(m, db), [m, db]);
@@ -48,6 +48,7 @@ export default function AnalysisPage() {
   const insights = useMemo(() => topInsights(buildInsights(a, prev, lang)), [a, prev, lang]);
   const [tab, setTab] = useState<Tab>('wants');
   const [open, setOpen] = useState<string | null>(null);
+  const [openCat, setOpenCat] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
 
   const header = (
@@ -90,12 +91,32 @@ export default function AnalysisPage() {
     ...(a.unclassified.count ? [{ value: 'un' as Tab, label: L('לא מסווג', 'Unclassified') }] : []),
   ];
   const activeTab: Tab = tab === 'un' && !a.unclassified.count ? 'wants' : tab;
-  const merchants = a.merchants.filter((x) => x.total > 0 && (activeTab === 'un' ? x.bucket == null : x.bucket === activeTab));
+  // Categories of the open bucket, then the merchants inside the open category.
+  const catRows = activeTab === 'un' ? [] : a.categories.filter((c) => c.bucket === activeTab && c.total !== 0);
+  const single = catRows.length <= 1; // nothing to choose between: go straight to merchants
+  const catId = activeTab === 'un' ? null : single ? catRows[0]?.id ?? activeTab : openCat;
+  const inCat = (t: Tx) => (activeTab === 'un' ? bucketOfTx(t) == null : single ? bucketOfTx(t) === activeTab : t.categoryId === catId);
+  const merchantMap = new Map<string, { name: string; total: number; count: number; manual?: boolean }>();
+  for (const t of m.txs) {
+    if (!inCat(t)) continue;
+    const k = merchantKey(t.merchant);
+    const row = merchantMap.get(k) ?? { name: t.merchant, total: 0, count: 0 };
+    row.total += t.amount; row.count++;
+    merchantMap.set(k, row);
+  }
+  // Lines typed by hand (rent, a bank standing order) belong to a category too.
+  if (activeTab !== 'un') for (const x of m.manual) {
+    if (x.kind !== 'expense' || !x.amount) continue;
+    const b = x.categoryId ? catById.get(x.categoryId)?.bucket : null;
+    if (single ? b === activeTab : x.categoryId === catId) merchantMap.set(`manual:${x.id}`, { name: x.label || L('הוצאה ידנית', 'Manual expense'), total: Number(x.amount) || 0, count: 1, manual: true });
+  }
+  const merchants = [...merchantMap.entries()].map(([k, v]) => ({ k, ...v })).filter((x) => x.total > 0).sort((x, y) => y.total - x.total);
   const shown = showAll ? merchants : merchants.slice(0, 6);
   const maxMerchant = Math.max(...merchants.map((x) => x.total), 1);
+  const maxCat = Math.max(...catRows.map((c) => c.total), 1);
   const tabTotal = activeTab === 'un' ? a.unclassified.total : a.spent[activeTab];
-  const txsOf = (name: string) => m.txs.filter((t) => merchantKey(t.merchant) === merchantKey(name) && (activeTab === 'un' ? bucketOfTx(t) == null : bucketOfTx(t) === activeTab))
-    .sort((x, y) => y.date.localeCompare(x.date));
+  const tabColor = activeTab === 'un' ? 'var(--neutral-mark)' : BUCKET_COLOR[activeTab];
+  const txsOf = (k: string) => m.txs.filter((t) => merchantKey(t.merchant) === k && inCat(t)).sort((x, y) => y.date.localeCompare(x.date));
   const openInst = a.installments.filter((i) => i.remaining > 0);
   const standingTotal = a.standing.reduce((s, x) => s + x.amount, 0);
 
@@ -191,35 +212,87 @@ export default function AnalysisPage() {
 
       {/* Where it went: bucket → merchants → transactions */}
       <Card>
-        <CardTitle hint={L('לחץ על בית עסק כדי לראות את העסקאות ולתקן סיווג', 'Tap a merchant to see its transactions and fix a category')}>{L('לאן הלך הכסף', 'Where the money went')}</CardTitle>
+        <CardTitle hint={L('לחץ על קטגוריה כדי לראות את בתי העסק, ועל בית עסק כדי לראות עסקאות ולתקן סיווג', 'Tap a category to see its merchants, and a merchant to see its transactions and fix a category')}>{L('לאן הלך הכסף', 'Where the money went')}</CardTitle>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-          <Segmented size="sm" value={activeTab} onChange={(v) => { setTab(v); setOpen(null); setShowAll(false); }} options={tabs} />
+          <Segmented size="sm" value={activeTab} onChange={(v) => { setTab(v); setOpen(null); setOpenCat(null); setShowAll(false); }} options={tabs} />
           <Money value={tabTotal} className="font-bold" />
         </div>
-        {merchants.length ? (
+        {activeTab !== 'un' && !single ? (
+          <ul className="space-y-1">
+            {catRows.map((c) => {
+              const isOpen = openCat === c.id;
+              return (
+                <li key={c.id}>
+                  <button type="button" onClick={() => { setOpenCat(isOpen ? null : c.id); setOpen(null); setShowAll(false); }} aria-expanded={isOpen} className="-mx-2 block w-[calc(100%+1rem)] rounded-xl px-2 py-2 text-start hover:bg-surface2">
+                    <span className="mb-1.5 flex items-baseline justify-between gap-3">
+                      <span className="min-w-0 truncate font-medium">{categoryName(catById.get(c.id), lang)}<span className="ms-2 text-xs font-normal text-muted">{tabTotal > 0 ? pct(c.total / tabTotal) : ''}</span></span>
+                      <span className="flex shrink-0 items-center gap-1"><Money value={c.total} className="font-semibold" /><ChevronDown size={15} className={cx('text-muted transition-transform', isOpen && 'rotate-180')} /></span>
+                    </span>
+                    <span className="block h-2.5 rounded-full bg-surface2"><span className="block h-full rounded-full" style={{ width: `${Math.max((Math.max(c.total, 0) / maxCat) * 100, 1)}%`, background: tabColor }} /></span>
+                  </button>
+                  {isOpen && <div className="mb-3 ms-3 mt-1 border-s-2 border-line ps-3">
+          <ul className="space-y-1">
+              {shown.map((x) => {
+                const isOpen = open === x.k;
+                return (
+                  <li key={x.k}>
+                    <button type="button" disabled={x.manual} onClick={() => setOpen(isOpen ? null : x.k)} aria-expanded={x.manual ? undefined : isOpen} className={cx('-mx-2 block w-[calc(100%+1rem)] rounded-xl px-2 py-1.5 text-start', !x.manual && 'hover:bg-surface2')}>
+                      <span className="mb-1 flex items-baseline justify-between gap-3 text-sm">
+                        <span className="min-w-0 truncate"><bdi>{x.name}</bdi>{x.count > 1 && <span className="ms-1.5 text-xs text-muted">×{x.count}</span>}</span>
+                        <span className="flex shrink-0 items-center gap-1"><Money value={x.total} className="font-semibold" />{!x.manual && <ChevronDown size={14} className={cx('text-muted transition-transform', isOpen && 'rotate-180')} />}</span>
+                      </span>
+                      <span className="block h-1.5 rounded-full bg-surface2"><span className="block h-full rounded-full" style={{ width: `${Math.max((x.total / maxMerchant) * 100, 1)}%`, background: tabColor }} /></span>
+                    </button>
+                    {isOpen && (
+                      <ul className="mb-2 mt-1 divide-y divide-line rounded-xl bg-surface2 px-3 text-sm">
+                        {txsOf(x.k).map((t) => (
+                          <li key={t.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+                            <span className="w-14 shrink-0 text-muted">{dayLabel(t.date, lang)}</span>
+                            <Money value={t.amount} agorot className={cx('me-auto font-medium', t.amount < 0 && 'text-good')} />
+                            {t.installment && <span className="text-xs text-muted" dir="ltr">{t.installment.n}/{t.installment.of}</span>}
+                            {sourceOf(t) === 'guess' && <span className="flex h-4 w-4 items-center justify-center rounded-full bg-warn text-[11px] font-bold text-page" title={L('ניחוש', 'Guess')}>?</span>}
+                            <select value={t.categoryId ?? ''} onChange={(e) => assign(key, [t.id], e.target.value || null)} aria-label={L('קטגוריה', 'Category')}
+                              className="max-w-40 rounded-lg border border-line bg-surface px-2 py-1 text-sm focus:border-accent focus:outline-none">
+                              <option value="">{L('לא מסווג', 'Unclassified')}</option>
+                              {cats.map((c) => <option key={c.id} value={c.id}>{categoryName(c, lang)}</option>)}
+                            </select>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </li>
+                );
+              })}
+              {!showAll && merchants.length > 6 && <li><Button size="sm" variant="ghost" className="mt-1" onClick={() => setShowAll(true)}>{L(`הצג את כל ${merchants.length}`, `Show all ${merchants.length}`)}</Button></li>}
+            </ul>
+                  </div>}
+                </li>
+              );
+            })}
+          </ul>
+        ) : merchants.length ? (
           <ul className="space-y-1">
             {shown.map((x) => {
-              const k = merchantKey(x.name), isOpen = open === k;
-              const color = activeTab === 'un' ? 'var(--neutral-mark)' : BUCKET_COLOR[activeTab];
+              const isOpen = open === x.k;
               return (
-                <li key={k}>
-                  <button type="button" onClick={() => setOpen(isOpen ? null : k)} aria-expanded={isOpen} className="-mx-2 block w-[calc(100%+1rem)] rounded-xl px-2 py-1.5 text-start hover:bg-surface2">
+                <li key={x.k}>
+                  <button type="button" disabled={x.manual} onClick={() => setOpen(isOpen ? null : x.k)} aria-expanded={x.manual ? undefined : isOpen} className={cx('-mx-2 block w-[calc(100%+1rem)] rounded-xl px-2 py-1.5 text-start', !x.manual && 'hover:bg-surface2')}>
                     <span className="mb-1 flex items-baseline justify-between gap-3 text-sm">
                       <span className="min-w-0 truncate"><bdi>{x.name}</bdi>{x.count > 1 && <span className="ms-1.5 text-xs text-muted">×{x.count}</span>}</span>
-                      <span className="flex shrink-0 items-center gap-1"><Money value={x.total} className="font-semibold" /><ChevronDown size={14} className={cx('text-muted transition-transform', isOpen && 'rotate-180')} /></span>
+                      <span className="flex shrink-0 items-center gap-1"><Money value={x.total} className="font-semibold" />{!x.manual && <ChevronDown size={14} className={cx('text-muted transition-transform', isOpen && 'rotate-180')} />}</span>
                     </span>
-                    <span className="block h-1.5 rounded-full bg-surface2"><span className="block h-full rounded-full" style={{ width: `${Math.max((x.total / maxMerchant) * 100, 1)}%`, background: color }} /></span>
+                    <span className="block h-1.5 rounded-full bg-surface2"><span className="block h-full rounded-full" style={{ width: `${Math.max((x.total / maxMerchant) * 100, 1)}%`, background: tabColor }} /></span>
                   </button>
                   {isOpen && (
                     <ul className="mb-2 mt-1 divide-y divide-line rounded-xl bg-surface2 px-3 text-sm">
-                      {txsOf(x.name).map((t) => (
+                      {txsOf(x.k).map((t) => (
                         <li key={t.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
                           <span className="w-14 shrink-0 text-muted">{dayLabel(t.date, lang)}</span>
                           <Money value={t.amount} agorot className={cx('me-auto font-medium', t.amount < 0 && 'text-good')} />
                           {t.installment && <span className="text-xs text-muted" dir="ltr">{t.installment.n}/{t.installment.of}</span>}
                           {sourceOf(t) === 'guess' && <span className="flex h-4 w-4 items-center justify-center rounded-full bg-warn text-[11px] font-bold text-page" title={L('ניחוש', 'Guess')}>?</span>}
                           <select value={t.categoryId ?? ''} onChange={(e) => assign(key, [t.id], e.target.value || null)} aria-label={L('קטגוריה', 'Category')}
-                            className="max-w-36 rounded-lg border border-line bg-surface px-2 py-1 text-sm focus:border-accent focus:outline-none">
+                            className="max-w-40 rounded-lg border border-line bg-surface px-2 py-1 text-sm focus:border-accent focus:outline-none">
                             <option value="">{L('לא מסווג', 'Unclassified')}</option>
                             {cats.map((c) => <option key={c.id} value={c.id}>{categoryName(c, lang)}</option>)}
                           </select>
@@ -230,9 +303,9 @@ export default function AnalysisPage() {
                 </li>
               );
             })}
+            {!showAll && merchants.length > 6 && <li><Button size="sm" variant="ghost" className="mt-1" onClick={() => setShowAll(true)}>{L(`הצג את כל ${merchants.length}`, `Show all ${merchants.length}`)}</Button></li>}
           </ul>
         ) : <p className="text-sm text-muted">{L('אין כאן הוצאות החודש.', 'Nothing here this month.')}</p>}
-        {!showAll && merchants.length > 6 && <Button size="sm" variant="ghost" className="mt-3" onClick={() => setShowAll(true)}>{L(`הצג את כל ${merchants.length} בתי העסק`, `Show all ${merchants.length} merchants`)}</Button>}
       </Card>
 
       {/* Details, closed by default */}

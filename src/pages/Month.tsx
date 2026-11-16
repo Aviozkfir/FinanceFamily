@@ -1,10 +1,10 @@
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, ArrowRight, BarChart3, Check, CreditCard, FileSpreadsheet, LayoutGrid, Plus, Target, Trash2, TriangleAlert, Upload } from 'lucide-react';
+import { ArrowLeft, ArrowRight, BarChart3, Check, CreditCard, FileSpreadsheet, LayoutGrid, Plus, Target, Trash2, TriangleAlert, Upload, Repeat } from 'lucide-react';
 import type { ManualItem } from '../lib/types';
 import { SPEND_BUCKETS } from '../lib/types';
 import { bucketName, categoryName, emptyMonth, sumItems, useL, useLang, useStore } from '../lib/store';
-import { currentMonth, isMonthKey, monthLabel, shiftMonth, uid } from '../lib/format';
+import { isMonthKey, monthLabel, shiftMonth, statementMonth, uid } from '../lib/format';
 import { parseStatementFile, type ParsedStatement } from '../lib/parser/statement';
 import { sourceOf } from '../lib/learn';
 import { AmountInput, BUCKET_COLOR, Button, Card, CardTitle, Dot, IconButton, Money, MonthSwitcher, PageHeader, Pill, Segmented, TextInput, cx } from '../components/ui';
@@ -36,10 +36,13 @@ export default function MonthPage() {
   const L = useL();
   const lang = useLang();
   const db = useStore((s) => s.db);
-  const { setIncomes, importStatements, removeFile, moveFile, setManual, updateMonth } = useStore();
-  const key = isMonthKey(month) ? month : shiftMonth(currentMonth(), -1);
+  const { setIncomes, importStatements, removeFile, moveFile, setManual, setRepeat, applyRecurring, updateMonth } = useStore();
+  const key = isMonthKey(month) ? month : statementMonth(db.settings.billingDay);
   const m = db.months[key] ?? emptyMonth(key);
   const Arrow = lang === 'he' ? ArrowLeft : ArrowRight;
+
+  // Standing orders reach a month the first time it is opened.
+  useEffect(() => { applyRecurring(key); }, [key, applyRecurring]);
 
   const fileInput = useRef<HTMLInputElement>(null);
   const [dragging, setDragging] = useState(false);
@@ -77,7 +80,7 @@ export default function MonthPage() {
 
   return (
     <div className="rise space-y-4">
-      <PageHeader title={monthLabel(key, lang)} subtitle={L('ארבעה צעדים קצרים — ואז התמונה של החודש', 'Four short steps — then the picture of the month')}>
+      <PageHeader title={monthLabel(key, lang)} subtitle={L(`דף החיוב של ${db.settings.billingDay} ב${monthLabel(key, lang).split(' ')[0]}, וההכנסות וההוצאות של אותו חודש`, `The statement charged on day ${db.settings.billingDay} of ${monthLabel(key, lang).split(' ')[0]}, with that month's income and expenses`)}>
         <MonthSwitcher value={key} onChange={(k) => navigate(`/month/${k}`)} />
       </PageHeader>
 
@@ -188,7 +191,7 @@ export default function MonthPage() {
       </Step>
 
       <Step n={4} done={m.manual.length > 0} title={L('הכנסות והוצאות נוספות', 'Other income & expenses')}
-        hint={L('מה שלא עובר באשראי: שכר דירה, העברות, מזומן, הכנסה חד-פעמית. הפקדה לחיסכון מסמנים כ"חיסכון" — היא לא נספרת כהוצאה', 'Anything outside the card: rent, transfers, cash, one-off income. Mark a savings deposit as "Savings" — it is not counted as spending')}>
+        hint={L('מה שלא עובר באשראי: שכר דירה, העברות, מזומן. סמן "כל חודש" כדי להפוך שורה להוראת קבע שתתווסף לבד לחודשים הבאים. הפקדה לחיסכון מסמנים כ"חיסכון" — היא לא נספרת כהוצאה', 'Anything outside the card: rent, transfers, cash. Mark a line "Monthly" to make it a standing order that is added to later months by itself. Mark a savings deposit as "Savings" — it is not counted as spending')}>
         <div className="space-y-2">
           {m.manual.map((x) => (
             <div key={x.id} className="flex flex-wrap items-center gap-2 rounded-2xl bg-surface2 p-2 sm:flex-nowrap sm:bg-transparent sm:p-0">
@@ -202,6 +205,10 @@ export default function MonthPage() {
                 </select>
               )}
               <AmountInput value={x.amount} onChange={(amount) => manualPatch(x.id, { amount })} className="w-32" />
+              <button type="button" onClick={() => setRepeat(key, x.id, !x.repeat)} aria-pressed={!!x.repeat} title={L('הוראת קבע: חוזר כל חודש', 'Standing order: repeats every month')}
+                className={cx('flex h-10 items-center gap-1.5 rounded-xl border px-2.5 text-[13px] font-medium', x.repeat ? 'border-accent bg-accent-soft text-ink' : 'border-line text-muted hover:text-ink')}>
+                <Repeat size={14} />{L('כל חודש', 'Monthly')}
+              </button>
               <IconButton label={L('הסר', 'Remove')} onClick={() => setManual(key, m.manual.filter((y) => y.id !== x.id))}><Trash2 size={16} /></IconButton>
             </div>
           ))}

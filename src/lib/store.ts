@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import type { BucketId, Category, DB, IncomeItem, ImportedFile, Lang, ManualItem, MonthData, Settings, Split, Tx } from './types';
+import { presetBucket, presetCategories, presetCategoryId, presetName } from './presets';
+import { guessPreset } from './heuristics';
 import { merchantKey, uid } from './format';
 import { txIdentity, type ParsedStatement } from './parser/statement';
 import { isNative } from './platform';
@@ -16,10 +18,12 @@ const BUILTIN: Category[] = [
 
 const emptyDb = (): DB => ({
   version: 1,
-  settings: { lang: 'he', theme: 'dark', split: DEFAULT_SPLIT },
-  categories: BUILTIN,
+  settings: { lang: 'he', theme: 'dark', split: DEFAULT_SPLIT, billingDay: 10 },
+  categories: [...BUILTIN, ...presetCategories()],
   merchantRules: {},
   months: {},
+  recurring: [],
+  presetsAdded: true,
 });
 
 export const emptyMonth = (key: string): MonthData => ({ key, incomes: [], files: [], txs: [], manual: [] });
@@ -33,14 +37,24 @@ export const emptyMonth = (key: string): MonthData => ({ key, incomes: [], files
 function normalize(raw: DB): DB {
   const base = emptyDb();
   const { aiProvider: _p, aiModel: _m, ...settings } = { ...base.settings, ...raw.settings } as Settings & { aiProvider?: unknown; aiModel?: unknown };
-  const categories = raw.categories?.length ? raw.categories : base.categories;
+  let categories = raw.categories?.length ? raw.categories : base.categories;
+  // First run of a version with ready-made categories: add them, and move what the built-in list
+  // can place (a supermarket under plain "needs" becomes "groceries"). The bucket never changes,
+  // so no total moves.
+  const addPresets = !raw.presetsAdded;
+  if (addPresets) categories = [...categories, ...presetCategories().filter((p) => !categories.some((c) => c.id === p.id))];
+  const refine = (merchant: string, categoryId: string | null): string | null => {
+    if (!addPresets || (categoryId !== 'needs' && categoryId !== 'wants')) return categoryId;
+    const preset = guessPreset(merchant);
+    return preset && preset !== 'ignore' && presetBucket(preset) === categoryId ? presetCategoryId(preset) : categoryId;
+  };
   const savings = new Set(categories.filter((c) => c.bucket === 'invest').map((c) => c.id));
   const months = Object.fromEntries(Object.entries(raw.months ?? {}).map(([k, month]) => {
     const { ai: _ai, ...m } = month as MonthData & { ai?: unknown };
-    return [k, { ...m, txs: (m.txs ?? []).map((t) => (t.categoryId && savings.has(t.categoryId) ? { ...t, categoryId: 'ignore' } : t)) }];
+    return [k, { ...m, txs: (m.txs ?? []).map((t) => (t.categoryId && savings.has(t.categoryId) ? { ...t, categoryId: 'ignore' } : { ...t, categoryId: refine(t.merchant, t.categoryId) })) }];
   }));
-  const merchantRules = Object.fromEntries(Object.entries(raw.merchantRules ?? {}).map(([k, c]) => [k, savings.has(c) ? 'ignore' : c]));
-  return { version: 1, settings, categories, merchantRules, months };
+  const merchantRules = Object.fromEntries(Object.entries(raw.merchantRules ?? {}).map(([k, c]) => [k, savings.has(c) ? 'ignore' : refine(k, c)!]));
+  return { version: 1, settings, categories, merchantRules, months, recurring: raw.recurring ?? [], presetsAdded: true };
 }
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -68,6 +82,10 @@ interface Store {
   updateCategory: (id: string, patch: Partial<Pick<Category, 'name' | 'bucket'>>) => void;
   removeCategory: (id: string) => void;
   setManual: (key: string, items: ManualItem[]) => void;
+  /** Makes a manual line a standing order (it is then added to every later month), or stops it being one. */
+  setRepeat: (key: string, itemId: string, on: boolean) => void;
+  /** Copies into a month the standing orders it does not have yet. Safe to call any time. */
+  applyRecurring: (key: string) => void;
   setIncomes: (key: string, items: IncomeItem[]) => void;
   deleteMonth: (key: string) => void;
   replaceDb: (db: DB) => void;
@@ -98,6 +116,20 @@ export const useStore = create<Store>((set, get) => {
     ...db,
     months: { ...db.months, [key]: fn(db.months[key] ?? emptyMonth(key)) },
   });
+
+  const pendingRecurring = (db: DB, key: string) => {
+    const applied = new Set(db.months[key]?.recurringApplied ?? []);
+    return db.recurring.filter((r) => r.since <= key && !applied.has(r.id));
+  };
+  const withRecurring = (db: DB, key: string): DB => {
+    const pending = pendingRecurring(db, key);
+    if (!pending.length) return db;
+    return withMonth(db, key, (m) => ({
+      ...m,
+      manual: [...m.manual, ...pending.map((r) => ({ id: uid(), kind: r.kind, label: r.label, amount: r.amount, categoryId: r.categoryId, repeat: r.id }))],
+      recurringApplied: [...(m.recurringApplied ?? []), ...pending.map((r) => r.id)],
+    }));
+  };
 
   return {
     db: emptyDb(),
@@ -154,7 +186,7 @@ export const useStore = create<Store>((set, get) => {
             statedTotal: p.statedTotal, importedAt: new Date().toISOString(),
           });
         }
-        return withMonth(db, key, (m) => ({ ...m, files, txs }));
+        return withRecurring(withMonth(db, key, (m) => ({ ...m, files, txs })), key);
       });
       return { added, skipped };
     },
@@ -245,7 +277,24 @@ export const useStore = create<Store>((set, get) => {
         return { ...db, categories: db.categories.filter((c) => c.id !== id), months, merchantRules };
       }),
 
-    setManual: (key, items) => mutate((db) => withMonth(db, key, (m) => ({ ...m, manual: items }))),
+    // Editing a standing order's line also updates the standing order, so later months get the new values.
+    setManual: (key, items) => mutate((db) => {
+      const byId = new Map(items.filter((x) => x.repeat).map((x) => [x.repeat!, x]));
+      const recurring = db.recurring.map((r) => { const x = byId.get(r.id); return x ? { ...r, kind: x.kind, label: x.label, amount: x.amount, categoryId: x.categoryId } : r; });
+      return { ...withMonth(db, key, (m) => ({ ...m, manual: items })), recurring };
+    }),
+    setRepeat: (key, itemId, on) => mutate((db) => {
+      const item = db.months[key]?.manual.find((x) => x.id === itemId);
+      if (!item) return db;
+      if (!on) {
+        return { ...withMonth(db, key, (m) => ({ ...m, manual: m.manual.map((x) => { if (x.id !== itemId) return x; const { repeat: _r, ...rest } = x; return rest; }) })),
+          recurring: db.recurring.filter((r) => r.id !== item.repeat) };
+      }
+      const id = uid();
+      return { ...withMonth(db, key, (m) => ({ ...m, manual: m.manual.map((x) => (x.id === itemId ? { ...x, repeat: id } : x)), recurringApplied: [...(m.recurringApplied ?? []), id] })),
+        recurring: [...db.recurring, { id, kind: item.kind, label: item.label, amount: item.amount, categoryId: item.categoryId, since: key }] };
+    }),
+    applyRecurring: (key) => { if (pendingRecurring(get().db, key).length) mutate((db) => withRecurring(db, key)); },
     setIncomes: (key, items) => mutate((db) => withMonth(db, key, (m) => ({ ...m, incomes: items }))),
     deleteMonth: (key) => mutate((db) => { const { [key]: _gone, ...months } = db.months; return { ...db, months }; }),
     replaceDb: (db) => mutate(() => normalize(db)),
@@ -267,6 +316,10 @@ const BUCKET_NAMES: Record<BucketId, [string, string]> = {
   ignore: ['לא לספור', "Don't count"],
 };
 export const bucketName = (b: BucketId, lang: Lang) => BUCKET_NAMES[b][lang === 'he' ? 0 : 1];
+const OTHER: Partial<Record<BucketId, [string, string]>> = { needs: ['צרכים אחרים', 'Other needs'], wants: ['רצונות אחרים', 'Other wants'] };
+/** Plain "needs" and "wants" read as "other needs / wants": what did not fit a more specific category. */
 export const categoryName = (c: Category | undefined, lang: Lang) =>
-  !c ? (lang === 'he' ? 'לא מסווג' : 'Unclassified') : c.builtin ? bucketName(c.bucket, lang) : c.name;
+  !c ? (lang === 'he' ? 'לא מסווג' : 'Unclassified')
+    : c.builtin ? OTHER[c.bucket]?.[lang === 'he' ? 0 : 1] ?? bucketName(c.bucket, lang)
+      : c.name || (c.preset && presetName(c.preset, lang)) || '';
 export const sumItems = (items: { amount: number }[]) => items.reduce((s, i) => s + (Number(i.amount) || 0), 0);

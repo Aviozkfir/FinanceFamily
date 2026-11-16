@@ -121,7 +121,11 @@ export function analyzeMonth(month: MonthData, db: DB): MonthAnalysis {
     categories: [...catRows.values()].sort((a, b) => b.total - a.total),
     merchants: [...merchantRows.values()].sort((a, b) => b.total - a.total),
     daily: [...dailyMap.entries()].map(([date, total]) => ({ date, total })).sort((a, b) => a.date.localeCompare(b.date)),
-    standing: counted.filter((t) => t.standing && t.amount > 0).map((t) => ({ merchant: t.merchant, amount: t.amount })).sort((a, b) => b.amount - a.amount),
+    // Card standing orders, plus the ones the user entered by hand (rent, bank transfers).
+    standing: [
+      ...counted.filter((t) => t.standing && t.amount > 0).map((t) => ({ merchant: t.merchant, amount: t.amount })),
+      ...manualExpenses.filter((x) => { const b = bucketOf(x.categoryId); return x.repeat && x.amount > 0 && (b === 'needs' || b === 'wants'); }).map((x) => ({ merchant: x.label, amount: Number(x.amount) || 0 })),
+    ].sort((a, b) => b.amount - a.amount),
     installments: counted.filter((t) => t.installment).map((t) => {
       const remaining = t.installment!.of - t.installment!.n;
       return { merchant: t.merchant, amount: t.amount, n: t.installment!.n, of: t.installment!.of, remaining, remainingTotal: remaining * t.amount };

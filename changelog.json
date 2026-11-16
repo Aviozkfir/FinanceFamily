@@ -1,5 +1,23 @@
 [
   {
+    "version": "1.5.0",
+    "date": "2026-11-16",
+    "he": [
+      "קטגוריות מוכנות בתוך צרכים ורצונות: סופר ומזון, דיור וחשבונות, רכב, בריאות, ילדים, אוכל בחוץ, קניות, בילוי, מנויים וחופשות. בניתוח רואים כמה הלך לכל אחת.",
+      "הוראות קבע: סמן שורה ידנית כ\"כל חודש\" (למשל שכר דירה) והיא תתווסף לבד לחודשים הבאים.",
+      "כפתור החזרה של הטלפון חוזר למסך הקודם, ומסך הבית יוצא מהאפליקציה.",
+      "יום החיוב של הכרטיס (ברירת מחדל 10) קובע איזה חודש האפליקציה מציעה לסכם. אפשר לשנות בהגדרות.",
+      "שפה וערכת צבעים נמצאות עכשיו רק בהגדרות."
+    ],
+    "en": [
+      "Ready-made categories inside needs and wants: groceries, home & bills, car, health, kids, eating out, shopping, leisure, subscriptions and travel. The analysis shows how much went to each.",
+      "Standing orders: mark a manual line \"Monthly\" (rent, for example) and it is added to later months by itself.",
+      "The phone's back button returns to the previous screen, and leaves the app from the home screen.",
+      "The card's billing day (10 by default) decides which month the app offers to wrap up. It can be changed in Settings.",
+      "Language and theme are now in Settings only."
+    ]
+  },
+  {
     "version": "1.4.0",
     "date": "2026-11-16",
     "he": [

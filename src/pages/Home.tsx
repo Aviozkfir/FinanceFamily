@@ -2,7 +2,7 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, CalendarPlus, CircleCheck, ListChecks, Target } from 'lucide-react';
 import { useL, useLang, useStore } from '../lib/store';
-import { currentMonth, money, monthLabel, pct, shiftMonth } from '../lib/format';
+import { money, monthLabel, pct, shiftMonth, statementMonth } from '../lib/format';
 import { analyzeMonth, filledMonths } from '../lib/analysis/compute';
 import { Card, CardTitle, Money, cx } from '../components/ui';
 import { MonthPicture } from '../components/charts';
@@ -11,8 +11,8 @@ export default function Home() {
   const L = useL();
   const lang = useLang();
   const db = useStore((s) => s.db);
-  const now = currentMonth();
-  const next = shiftMonth(now, 1), prev = shiftMonth(now, -1);
+  // `prev` is the month whose statement is the latest one out; `next` is the one being lived now.
+  const prev = statementMonth(db.settings.billingDay), next = shiftMonth(prev, 1);
   const Arrow = lang === 'he' ? ArrowLeft : ArrowRight;
 
   const has = (k: string) => { const m = db.months[k]; return !!m && (m.txs.length > 0 || m.manual.length > 0); };
@@ -38,7 +38,6 @@ export default function Home() {
 
   const others = [
     !db.months[next]?.goal && step?.icon !== Target ? { to: `/goal/${next}`, label: L(`הגדר יעד ל${monthLabel(next, lang)}`, `Set a goal for ${monthLabel(next, lang)}`) } : null,
-    { to: `/month/${now}`, label: L(`מילוי ${monthLabel(now, lang)}`, `Fill in ${monthLabel(now, lang)}`) },
   ].filter((x): x is { to: string; label: string } => !!x);
 
   return (

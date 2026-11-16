@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { DndContext, DragOverlay, MouseSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
 import { Check, CheckCheck, Globe, Layers, Pencil, Plus, Repeat, Search, Sparkles, Trash2, Wand2, X } from 'lucide-react';
@@ -96,7 +96,8 @@ export default function ClassifyPage() {
   const reviewing = onlyGuesses && guesses.length > 0;
   const match = (i: Item) => (!q || i.merchant.toLowerCase().includes(q)) && (!reviewing || i.source === 'guess');
   const pool = items.filter((i) => !i.categoryId);
-  const cats = db.categories.filter((c) => c.bucket !== 'invest');
+  // Needs first, then wants, then "don't count"; inside each, the plain "other" one comes last.
+  const cats = BUCKETS.flatMap((b) => { const inB = db.categories.filter((c) => c.bucket === b); return [...inB.filter((c) => !c.builtin), ...inB.filter((c) => c.builtin)]; });
   const catById = new Map(cats.map((c) => [c.id, c]));
   const colorOf = (categoryId: string | null) => BUCKET_COLOR[categoryId ? catById.get(categoryId)?.bucket ?? 'none' : 'none'];
 
@@ -196,12 +197,15 @@ export default function ClassifyPage() {
               {cats.map((c, idx) => {
                 const inCat = items.filter((i) => i.categoryId === c.id);
                 return (
-                  <Zone key={c.id} id={c.id} className="flex min-h-36 flex-col rounded-2xl border border-line bg-surface p-3">
-                    <div className="mb-2 flex items-center gap-2">
+                  <Fragment key={c.id}>
+                  {(idx === 0 || cats[idx - 1].bucket !== c.bucket) && c.bucket !== 'ignore' && (
+                    <h3 className="flex items-center gap-2 pt-1 text-sm font-semibold text-ink2 sm:col-span-2"><Dot color={BUCKET_COLOR[c.bucket]} />{bucketName(c.bucket, lang)}</h3>
+                  )}
+                  <Zone id={c.id} className={cx('flex flex-col rounded-2xl border border-line bg-surface p-3', inCat.length ? 'min-h-24' : 'min-h-0')}>
+                    <div className={cx('flex items-center gap-2', inCat.length > 0 && 'mb-2')}>
                       <Dot color={BUCKET_COLOR[c.bucket]} className="!h-3 !w-3" />
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-semibold">{categoryName(c, lang)}</p>
-                        {!c.builtin && <p className="text-xs text-muted">{L('נספר תחת', 'Counts as')} {bucketName(c.bucket, lang)}</p>}
                       </div>
                       <span className="text-end text-sm"><Money value={inCat.reduce((s, i) => s + i.amount, 0)} className="font-bold" /><span className="block text-xs text-muted">{inCat.reduce((s, i) => s + i.txs.length, 0)}</span></span>
                       {!c.builtin && <IconButton label={L('עריכת קטגוריה', 'Edit category')} className="!h-7 !w-7" onClick={() => setCatModal({ id: c.id, name: c.name, bucket: c.bucket })}><Pencil size={13} /></IconButton>}
@@ -209,13 +213,13 @@ export default function ClassifyPage() {
                     </div>
                     <div className="flex flex-1 flex-wrap content-start gap-1.5">
                       {inCat.filter(match).map((i) => <Bubble key={i.id} item={i} color={BUCKET_COLOR[c.bucket]} selected={selected.has(i.id)} onToggle={() => toggle(i.id)} />)}
-                      {!inCat.length && <p className="m-auto text-[13px] text-muted">{L('גרור לכאן', 'Drop here')}</p>}
                     </div>
                   </Zone>
+                  </Fragment>
                 );
               })}
               <button onClick={() => setCatModal({ name: '', bucket: 'wants' })}
-                className="flex min-h-36 flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-line-strong text-muted transition-colors hover:border-accent hover:text-ink">
+                className="flex min-h-24 flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-line-strong text-muted transition-colors hover:border-accent hover:text-ink">
                 <Plus size={22} /><span className="text-sm font-semibold">{L('קטגוריה חדשה', 'New category')}</span>
                 <span className="px-4 text-center text-xs">{L('למשל: מסעדות, רכב, ילדים', 'e.g. Restaurants, Car, Kids')}</span>
               </button>

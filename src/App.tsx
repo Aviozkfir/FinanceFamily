@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
-import { CalendarRange, CloudOff, Home as HomeIcon, Languages, Moon, Settings as SettingsIcon, Sun, TrendingUp } from 'lucide-react';
+import { CalendarRange, CloudOff, Home as HomeIcon, Settings as SettingsIcon, TrendingUp } from 'lucide-react';
 import { useL, useStore } from './lib/store';
-import { currentMonth, shiftMonth } from './lib/format';
+import { statementMonth } from './lib/format';
 import { cx } from './components/ui';
 import UpdateBanner from './components/UpdateBanner';
 import WhatsNew from './components/WhatsNew';
@@ -18,9 +18,10 @@ import SettingsPage from './pages/Settings';
 
 export default function App() {
   const { ready, load, offline } = useStore();
-  const { lang, theme } = useStore((s) => s.db.settings);
-  const setSettings = useStore((s) => s.setSettings);
-  const lastMonthFilled = useStore((st) => { const m = st.db.months[shiftMonth(currentMonth(), -1)]; return !!m && (m.txs.length > 0 || m.manual.length > 0); });
+  const { lang, theme, billingDay } = useStore((s) => s.db.settings);
+  // The month whose statement is the latest one out: where the Month tab goes.
+  const month = statementMonth(billingDay);
+  const monthFilled = useStore((st) => { const m = st.db.months[month]; return !!m && (m.txs.length > 0 || m.manual.length > 0); });
   const L = useL();
   const { pathname } = useLocation();
 
@@ -36,11 +37,10 @@ export default function App() {
 
   if (!ready) return <div className="flex h-full items-center justify-center text-muted">…</div>;
 
-  const now = currentMonth();
   const nav = [
     { to: '/', icon: HomeIcon, label: L('בית', 'Home'), end: true },
-    // Straight to the picture when last month is filled in, otherwise to filling it in.
-    { to: lastMonthFilled ? `/month/${shiftMonth(now, -1)}/analysis` : `/month/${shiftMonth(now, -1)}`, match: ['/month', '/goal'], icon: CalendarRange, label: L('חודש', 'Month') },
+    // Straight to the picture when the month is filled in, otherwise to filling it in.
+    { to: monthFilled ? `/month/${month}/analysis` : `/month/${month}`, match: ['/month', '/goal'], icon: CalendarRange, label: L('חודש', 'Month') },
     { to: '/history', match: ['/history', '/trends'], icon: TrendingUp, label: L('לאורך זמן', 'Over time') },
   ];
   const fullscreen = pathname.endsWith('/classify');
@@ -50,19 +50,6 @@ export default function App() {
       className={({ isActive }) => cx('flex h-9 w-9 items-center justify-center rounded-xl hover:bg-surface2 hover:text-ink', isActive ? 'bg-surface2 text-accent' : 'text-ink2')}>
       <SettingsIcon size={17} />
     </NavLink>
-  );
-
-  const toggles = (
-    <>
-      <button onClick={() => setSettings({ lang: lang === 'he' ? 'en' : 'he' })} title={L('Switch to English', 'עבור לעברית')}
-        className="flex h-9 items-center gap-1.5 rounded-xl px-2.5 text-[13px] font-medium text-ink2 hover:bg-surface2 hover:text-ink">
-        <Languages size={16} />{lang === 'he' ? 'EN' : 'עב'}
-      </button>
-      <button onClick={() => setSettings({ theme: theme === 'dark' ? 'light' : 'dark' })} aria-label={L('החלף ערכת צבעים', 'Toggle theme')}
-        className="flex h-9 w-9 items-center justify-center rounded-xl text-ink2 hover:bg-surface2 hover:text-ink">
-        {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
-      </button>
-    </>
   );
 
   return (
@@ -81,7 +68,7 @@ export default function App() {
               </NavLink>
             ))}
           </nav>
-          <div className="flex items-center justify-between border-t border-line pt-3">{toggles}{settingsLink}</div>
+          <div className="flex items-center justify-end border-t border-line pt-3">{settingsLink}</div>
         </aside>
       )}
 
@@ -89,7 +76,7 @@ export default function App() {
         {!fullscreen && (
           <div className="flex items-center justify-between px-4 pt-3 lg:hidden">
             <span className="flex items-center gap-2 font-bold"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink text-page"><TrendingUp size={16} strokeWidth={2.6} /></span>{L('הכסף שלי', 'My Money')}</span>
-            <div className="flex items-center">{toggles}{settingsLink}</div>
+            {settingsLink}
           </div>
         )}
         {!fullscreen && <UpdateBanner />}
