@@ -18,7 +18,7 @@ import { BUCKET_COLOR, Button, Dot, IconButton, PageHeader, Pill, Segmented, Tex
  */
 function Section({ title, summary, children }: { title: string; summary?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <details className="group rounded-2xl border border-line bg-surface shadow-[var(--shadow)]">
+    <details className="group rounded-[26px] border border-line bg-surface shadow-[var(--shadow)]">
       <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-4 [&::-webkit-details-marker]:hidden">
         <span className="min-w-0 flex-1">
           <span className="block text-[15px] font-semibold">{title}</span>

@@ -12,7 +12,7 @@ export const BUCKET_COLOR: Record<BucketId | 'none', string> = {
 
 export function Card({ className, children, ...rest }: { className?: string; children: ReactNode } & React.HTMLAttributes<HTMLDivElement>) {
   return (
-    <div {...rest} className={cx('rounded-2xl border border-line bg-surface p-5 shadow-[var(--shadow)]', className)}>
+    <div {...rest} className={cx('rounded-[26px] border border-line bg-surface p-5 shadow-[var(--shadow)]', className)}>
       {children}
     </div>
   );
@@ -38,7 +38,7 @@ export function Button({ variant = 'soft', size = 'md', icon, className, childre
       className={cx(
         'press inline-flex shrink-0 items-center justify-center gap-2 rounded-xl font-medium disabled:opacity-45',
         size === 'sm' && 'h-8 px-3 text-[13px]', size === 'md' && 'h-10 px-4 text-sm', size === 'lg' && 'h-12 px-6 text-[15px]',
-        variant === 'primary' && 'bg-ink text-page hover:opacity-90',
+        variant === 'primary' && 'bg-[var(--btn)] font-semibold text-[var(--btn-ink)] hover:opacity-90',
         variant === 'soft' && 'border border-line bg-surface2 text-ink hover:bg-surface3',
         variant === 'ghost' && 'text-ink2 hover:bg-surface2 hover:text-ink',
         variant === 'danger' && 'text-bad hover:bg-surface2',
@@ -157,7 +157,7 @@ export function Meter({ value, target, color, soft, overIsBad = true, label }: {
   const pctOf = (v: number) => `${(Math.max(v, 0) / scale) * 100}%`;
   const over = overIsBad && target > 0 && value > target;
   return (
-    <div className="relative h-2.5 rounded-full" style={{ background: soft }} role="img" aria-label={label}>
+    <div className="relative h-2 rounded-full" style={{ background: soft }} role="img" aria-label={label}>
       <div className="grow absolute inset-y-0 start-0 rounded-full" style={{ width: pctOf(over ? target : value), background: color }} />
       {over && <div className="grow-late absolute inset-y-0 rounded-e-full" style={{ insetInlineStart: pctOf(target), width: pctOf(value - target), background: 'var(--bad)' }} />}
       {target > 0 && <div className="appear-late absolute -inset-y-1 w-0.5 rounded bg-ink" style={{ insetInlineStart: pctOf(target) }} />}

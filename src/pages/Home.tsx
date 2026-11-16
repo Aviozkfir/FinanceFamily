@@ -2,10 +2,10 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, CalendarPlus, CircleCheck, ListChecks, Target } from 'lucide-react';
 import { useL, useLang, useStore } from '../lib/store';
-import { money, monthLabel, pct, shiftMonth, statementMonth } from '../lib/format';
+import { money, monthLabel, shiftMonth, statementMonth } from '../lib/format';
 import { analyzeMonth, filledMonths } from '../lib/analysis/compute';
-import { Card, CardTitle, CountMoney, cx } from '../components/ui';
-import { MonthPicture } from '../components/charts';
+import { Card, CardTitle } from '../components/ui';
+import { MonthHero } from '../components/charts';
 
 export default function Home() {
   const L = useL();
@@ -48,7 +48,7 @@ export default function Home() {
           <p className="flex items-center gap-2 text-[13px] font-medium text-accent"><step.icon size={16} />{L('הצעד הבא', 'Next step')}</p>
           <h1 className="mt-2 text-2xl font-bold leading-tight tracking-tight">{step.title}</h1>
           <p className="mt-1.5 text-sm text-ink2">{step.body}</p>
-          <span className="mt-4 inline-flex h-10 items-center gap-2 rounded-xl bg-ink px-4 text-sm font-medium text-page">{step.cta}<Arrow size={16} /></span>
+          <span className="mt-4 inline-flex h-10 items-center gap-2 rounded-2xl bg-[var(--btn)] px-4 text-sm font-semibold text-[var(--btn-ink)]">{step.cta}<Arrow size={16} /></span>
         </Link>
       ) : (
         <div className="flex items-center gap-3 rounded-3xl border border-line bg-surface p-6 shadow-[var(--shadow)]">
@@ -63,16 +63,7 @@ export default function Home() {
           <CardTitle action={<Link to={`/month/${latest.key}/analysis`} className="shrink-0 text-sm font-medium text-accent hover:underline">{L('לניתוח המלא', 'Full analysis')}</Link>}>
             {monthLabel(latest.key, lang)}
           </CardTitle>
-          {latest.income > 0 ? (
-            <p className="mb-4 flex flex-wrap items-baseline gap-x-3">
-              <span className="text-sm text-ink2">{latest.leftover >= 0 ? L('חסכת', 'You saved') : L('חרגת ב-', 'You overspent by')}</span>
-              <CountMoney value={Math.abs(latest.leftover)} className={cx('text-3xl font-bold tracking-tight', latest.leftover < 0 && 'text-bad')} />
-              {latest.leftover >= 0 && <span className="text-sm text-ink2">{pct(latest.savingsRate ?? 0)} {L('מההכנסה', 'of income')}</span>}
-            </p>
-          ) : (
-            <p className="mb-4 flex flex-wrap items-baseline gap-x-3"><span className="text-sm text-ink2">{L('הוצאת', 'You spent')}</span><CountMoney value={latest.totalSpent} className="text-3xl font-bold tracking-tight" /></p>
-          )}
-          <MonthPicture a={latest} legend />
+          <MonthHero a={latest} />
         </Card>
       ) : (
         <Card>

@@ -108,8 +108,8 @@ export default function App() {
       {!fullscreen && (
         <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden">
           {nav.map((n) => (
-            <NavLink key={n.to} to={n.to} className={cx('press flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs font-medium', active(n) ? 'text-ink' : 'text-muted')}>
-              <n.icon size={21} key={String(active(n))} className={active(n) ? 'pop text-accent' : ''} /><span className="max-w-full truncate px-0.5">{n.label}</span>
+            <NavLink key={n.to} to={n.to} className={cx('press flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs', active(n) ? 'font-bold text-[var(--accent-ink)]' : 'font-medium text-muted')}>
+              <n.icon size={21} key={String(active(n))} className={active(n) ? 'pop' : ''} /><span className="max-w-full truncate px-0.5">{n.label}</span>
             </NavLink>
           ))}
         </nav>

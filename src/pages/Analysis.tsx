@@ -10,7 +10,7 @@ import { analyzeMonth, previousAnalysis } from '../lib/analysis/compute';
 import { buildInsights, topInsights, type Tone } from '../lib/analysis/insights';
 import { sourceOf } from '../lib/learn';
 import { BUCKET_COLOR, Button, Card, CardTitle, CountMoney, Dot, Empty, Meter, Money, MonthSwitcher, PageHeader, Segmented, cx } from '../components/ui';
-import { DailyChart, MonthPicture } from '../components/charts';
+import { DailyChart, MonthHero } from '../components/charts';
 
 const TONE_ICON: Record<Tone, React.ReactNode> = {
   good: <CircleCheck size={18} className="text-good" />, warn: <TriangleAlert size={18} className="text-warn" />,
@@ -22,7 +22,7 @@ type Tab = 'wants' | 'needs' | 'un';
 /** A section that stays closed until asked for. */
 function More({ title, value, children }: { title: string; value?: React.ReactNode; children: React.ReactNode }) {
   return (
-    <details className="group rounded-2xl border border-line bg-surface shadow-[var(--shadow)]">
+    <details className="group rounded-[26px] border border-line bg-surface shadow-[var(--shadow)]">
       <summary className="flex cursor-pointer list-none items-center gap-3 px-5 py-4 [&::-webkit-details-marker]:hidden">
         <span className="me-auto text-[15px] font-semibold">{title}</span>
         {value != null && <span className="text-sm text-ink2">{value}</span>}
@@ -133,59 +133,13 @@ export default function AnalysisPage() {
 
       {/* The picture */}
       <Card>
-        {hasIncome ? (
-          <>
-            <p className="text-sm text-ink2">{a.leftover >= 0 ? L('חסכת החודש', 'You saved this month') : L('הוצאת יותר ממה שהכנסת', 'You spent more than you earned')}</p>
-            <p className="mt-0.5 flex flex-wrap items-baseline gap-x-3">
-              <CountMoney value={a.leftover} className={cx('text-4xl font-bold tracking-tight', a.leftover < 0 && 'text-bad')} />
-              {a.leftover >= 0 && <span className="text-sm text-ink2">{pct(a.savingsRate ?? 0)} {L('מההכנסה', 'of income')}{a.target.invest > 0 && <> · {L('היעד', 'target')} {a.split.invest}%</>}</span>}
-            </p>
-            {a.target.invest > 0 && a.leftover >= 0 && (
-              <p className="mt-1.5 flex items-center gap-1.5 text-sm text-ink2">
-                {metSavings ? <><CircleCheck size={16} className="text-good" />{L('עמדת ביעד החיסכון', 'You met the savings target')}</>
-                  : <><TriangleAlert size={16} className="text-warn" />{L(`חסרים ${money(a.target.invest - saved, lang)} ליעד החיסכון`, `${money(a.target.invest - saved, lang)} short of the savings target`)}</>}
-              </p>
-            )}
-          </>
-        ) : (
-          <>
-            <p className="text-sm text-ink2">{L('הוצאת החודש', 'You spent this month')}</p>
-            <CountMoney value={a.totalSpent} className="mt-0.5 block text-4xl font-bold tracking-tight" />
-            <p className="mt-1.5 flex flex-wrap items-center gap-x-2 text-sm text-ink2"><TriangleAlert size={16} className="text-warn" />{L('לא הוזנה הכנסה, אז אי אפשר לחשב חיסכון.', 'No income was entered, so savings cannot be calculated.')}
-              <Link to={`/month/${key}`} className="font-semibold text-accent hover:underline">{L('הוסף הכנסה', 'Add income')}</Link></p>
-          </>
+        <MonthHero a={a} />
+        {!hasIncome && (
+          <p className="mt-3 flex flex-wrap items-center gap-x-2 text-sm text-ink2"><TriangleAlert size={16} className="text-warn" />{L('לא הוזנה הכנסה, אז אי אפשר לחשב חיסכון.', 'No income was entered, so savings cannot be calculated.')}
+            <Link to={`/month/${key}`} className="font-semibold text-accent hover:underline">{L('הוסף הכנסה', 'Add income')}</Link></p>
         )}
-
-        <div className="mt-5"><MonthPicture a={a} /></div>
-
-        <ul className="mt-4 divide-y divide-line">
-          {rows.filter((r) => r.b !== 'invest' || hasIncome).map((r) => (
-            <li key={r.b} className="py-3">
-             <div className="flex items-center gap-3">
-              <Dot color={BUCKET_COLOR[r.b]} className="!h-3 !w-3" />
-              <div className="min-w-0 flex-1">
-                <p className="font-medium">{bucketName(r.b, lang)}</p>
-                {r.target > 0 && (
-                  <p className="flex items-center gap-1 text-[13px] text-ink2">
-                    {r.ok ? <Check size={13} className="shrink-0 text-good" /> : <TriangleAlert size={13} className="shrink-0 text-bad" />}
-                    {r.b === 'invest'
-                      ? r.ok ? L(`${money(r.diff, lang)} מעל היעד`, `${money(r.diff, lang)} above target`) : L(`${money(-r.diff, lang)} מתחת ליעד`, `${money(-r.diff, lang)} below target`)
-                      : r.ok ? L(`נשארו ${money(r.diff, lang)}`, `${money(r.diff, lang)} left`) : L(`חריגה של ${money(-r.diff, lang)}`, `${money(-r.diff, lang)} over`)}
-                  </p>
-                )}
-              </div>
-              <div className="text-end">
-                <Money value={r.actual} className="font-semibold" />
-                {r.target > 0 && <p className="text-[13px] text-muted">{L('מתוך', 'of')} <Money value={r.target} /></p>}
-              </div>
-             </div>
-             {r.target > 0 && <div className="mt-2"><Meter value={r.actual} target={r.target} color={BUCKET_COLOR[r.b]} soft={`var(--${r.b}-soft)`} overIsBad={r.b !== 'invest'}
-               label={`${bucketName(r.b, lang)}: ${money(r.actual, lang)} ${L('מתוך', 'of')} ${money(r.target, lang)}`} /></div>}
-            </li>
-          ))}
-        </ul>
         {spendDiff != null && Math.abs(spendDiff) >= 0.01 && (
-          <p className="mt-1 border-t border-line pt-3 text-[13px] text-ink2">
+          <p className="mt-4 border-t border-line pt-3 text-[13px] text-ink2">
             {spendDiff > 0 ? L(`ההוצאות עלו ב-${pct(spendDiff)} לעומת החודש הקודם`, `Spending is up ${pct(spendDiff)} on last month`) : L(`ההוצאות ירדו ב-${pct(-spendDiff)} לעומת החודש הקודם`, `Spending is down ${pct(-spendDiff)} on last month`)}
             {' '}(<Money value={a.totalSpent} /> {L('מול', 'vs')} <Money value={prev!.totalSpent} />)
           </p>
