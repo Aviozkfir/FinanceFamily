@@ -108,7 +108,7 @@ export default function TrendsPage() {
       </Card>
 
       {forecast && (
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Card>
             <CardTitle hint={n === 1
               ? L('מבוסס על חודש אחד בלבד — התחזית תשתפר ככל שתמלא עוד חודשים', 'Based on a single month — the forecast improves as you fill in more')

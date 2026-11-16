@@ -3,32 +3,20 @@
 
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
-/* Two skins of one design.
-   Light is cream rather than white: easier on the eye, and the colors sit warmer on it.
-   Dark is a deep blue-black with one lime accent. Lime cannot be seen on cream, so the light
-   theme has none of it: its buttons are coffee brown, from the cream's own family, and the one
-   color that draws the eye is the savings green of the ring.
-   The three series colors of each theme pass the colorblind and contrast checks on its surface. */
+/* Light is cream rather than white: the same design, on a warmer surface that is easier on the eye. */
 :root {
   color-scheme: light;
   --page: #f5efe4;
-  --glow: #efe3cc;
   --surface: #fbf7ef;
   --surface2: #f1eadc;
   --surface3: #e6dece;
-  --line: rgba(28, 26, 21, 0.09);
+  --line: rgba(28, 26, 21, 0.1);
   --line-strong: rgba(28, 26, 21, 0.2);
   --ink: #1c1a15;
   --ink2: #4a453a;
   --muted: #6f6859;
-  --accent: #0f6b4a;
-  --accent-ink: #0f6b4a;
-  --accent-soft: rgba(22, 148, 103, 0.13);
-  --ring: #169467;
-  --btn: #3a2c22;
-  --btn-ink: #fbf7ef;
-  --nav-on: #3a2c22;
-  --track: rgba(28, 26, 21, 0.09);
+  --accent: #5a48cf;
+  --accent-soft: rgba(98, 80, 214, 0.12);
   --needs: #2b6fd0;
   --wants: #db5a26;
   --invest: #169467;
@@ -40,40 +28,33 @@
   --warn: #a86a00;
   --bad: #c93a3a;
   --grid: #e2dacb;
-  --shadow: 0 1px 2px rgba(60, 45, 15, 0.04), 0 10px 26px -14px rgba(60, 45, 15, 0.18);
+  --shadow: 0 1px 2px rgba(60, 45, 15, 0.04), 0 8px 24px -12px rgba(60, 45, 15, 0.16);
 }
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --page: #0a0c11;
-  --glow: #1b2340;
-  --surface: #14171f;
-  --surface2: #1b1f29;
-  --surface3: #272c38;
+  --page: #0c0d10;
+  --surface: #15171c;
+  --surface2: #1c1f26;
+  --surface3: #272b34;
   --line: rgba(255, 255, 255, 0.08);
-  --line-strong: rgba(255, 255, 255, 0.17);
-  --ink: #f2f4f8;
-  --ink2: #c2c6d0;
-  --muted: #8a90a0;
-  --accent: #c5f24e;
-  --accent-ink: #c5f24e;
-  --accent-soft: rgba(197, 242, 78, 0.14);
-  --ring: #c5f24e;
-  --btn: #c5f24e;
-  --btn-ink: #0a0c11;
-  --nav-on: #c5f24e;
-  --track: rgba(255, 255, 255, 0.09);
+  --line-strong: rgba(255, 255, 255, 0.16);
+  --ink: #f0efec;
+  --ink2: #c3c2b7;
+  --muted: #8b8a84;
+  --accent: #9085e9;
+  --accent-soft: rgba(144, 133, 233, 0.16);
   --needs: #3987e5;
   --wants: #d95926;
   --invest: #199e70;
   --needs-soft: #17304f;
   --wants-soft: #48230f;
   --invest-soft: #0f3a2b;
-  --neutral-mark: #5b6170;
-  --good: #3fca5a;
+  --neutral-mark: #5b5d66;
+  --good: #2fbf2f;
   --warn: #fab219;
-  --bad: #f07070;
-  --grid: #262b36;
-  --shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 14px 34px -18px rgba(0, 0, 0, 0.7);
+  --bad: #ef6b6b;
+  --grid: #2a2d35;
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 12px 32px -16px rgba(0, 0, 0, 0.6);
 }
 
 @theme inline {
@@ -98,6 +79,8 @@
 }
 
 html, body, #root { height: 100%; }
+/* No screen may ever be wider than the phone: a too-wide element is clipped, not allowed to slide the app sideways. */
+html, body { overflow-x: clip; }
 /* Keep content clear of the phone's status bar and gesture area. */
 #root { padding-top: env(safe-area-inset-top); padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
 body {
@@ -121,8 +104,12 @@ input[type='number'] { -moz-appearance: textfield; appearance: textfield; }
 
 .num { font-variant-numeric: tabular-nums; }
 
-/* The one decorative touch: a soft glow at the top of the page, in the theme's own tint. */
-.glow { background: radial-gradient(70rem 26rem at 85% -9rem, var(--glow), transparent 70%); }
+/* Soft glow behind the page header, the one decorative touch. */
+.glow {
+  background:
+    radial-gradient(60rem 22rem at 85% -8rem, color-mix(in oklab, var(--accent) 16%, transparent), transparent 70%),
+    radial-gradient(40rem 18rem at 10% -6rem, color-mix(in oklab, var(--needs) 10%, transparent), transparent 70%);
+}
 
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 .rise { animation: rise 0.28s ease-out both; }
@@ -137,10 +124,6 @@ input[type='number'] { -moz-appearance: textfield; appearance: textfield; }
 .press:active:not(:disabled) { transform: scale(0.96); }
 
 /* Bars and meters grow from nothing to their width (the width itself is set inline). */
-/* The savings ring draws itself from empty to its value (the lengths are set inline). */
-@keyframes ring { from { stroke-dashoffset: var(--ring-full); } }
-.ring-draw { animation: ring 0.9s var(--ease-out) 0.1s both; }
-
 @keyframes grow { from { width: 0; } }
 .grow { animation: grow 0.7s var(--ease-out) both; }
 .grow-late { animation: grow 0.7s var(--ease-out) 0.15s both; }
@@ -157,7 +140,7 @@ input[type='number'] { -moz-appearance: textfield; appearance: textfield; }
 details[open] > summary + * { animation: rise 0.22s ease-out both; }
 
 @media (prefers-reduced-motion: reduce) {
-  .rise, .grow, .grow-late, .pop, .appear-late, .ring-draw, details[open] > summary + * { animation: none; }
+  .rise, .grow, .grow-late, .pop, .appear-late, details[open] > summary + * { animation: none; }
   .press:active:not(:disabled) { transform: none; }
   * { transition: none !important; }
 }

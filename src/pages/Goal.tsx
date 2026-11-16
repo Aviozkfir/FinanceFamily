@@ -69,7 +69,7 @@ export default function GoalPage() {
         <MonthSwitcher value={key} onChange={(k) => navigate(`/goal/${k}`)} />
       </PageHeader>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <div className="space-y-4">
           <Card>
             <CardTitle hint={L('משכורת, הכנסה נוספת, קצבאות — כל מה שצפוי להיכנס', 'Salary, side income, benefits — everything you expect')}>

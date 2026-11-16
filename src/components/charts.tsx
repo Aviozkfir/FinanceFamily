@@ -5,7 +5,7 @@ import { SPEND_BUCKETS } from '../lib/types';
 import { dayLabel, money, moneyCompact, monthLabel, niceScale, pct } from '../lib/format';
 import { bucketName, useLang } from '../lib/store';
 import type { MonthAnalysis } from '../lib/analysis/compute';
-import { BUCKET_COLOR, CountMoney, Dot, Meter, Money, cx } from './ui';
+import { BUCKET_COLOR, Dot, Money, cx } from './ui';
 
 // ---------- tooltip ----------
 interface Tip { x: number; y: number; content: ReactNode }
@@ -352,64 +352,5 @@ export function Sparkline({ values: inOrder, width = 120, height = 32 }: { value
       <polyline points={pts.map((p) => p.join(',')).join(' ')} fill="none" stroke="var(--neutral-mark)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
       <circle cx={lx} cy={ly} r={4} fill="var(--accent)" stroke="var(--surface)" strokeWidth={2} />
     </svg>
-  );
-}
-
-// ---------- the month's headline: how much was saved, and how spending sat against the plan ----------
-/** A ring filled to the share of income that was saved. Past the target it simply keeps filling. */
-function SavingsRing({ rate, bad }: { rate: number; bad?: boolean }) {
-  const lang = useLang();
-  const r = 48, full = 2 * Math.PI * r, shown = Math.max(0, Math.min(rate, 1)) * full;
-  return (
-    <svg width={112} height={112} viewBox="0 0 118 118" className="shrink-0" role="img" aria-label={`${pct(rate)} ${lang === 'he' ? 'מההכנסה נחסכו' : 'of income saved'}`}>
-      <circle cx={59} cy={59} r={r} fill="none" stroke="var(--track)" strokeWidth={12} />
-      {shown > 0 && <circle className="ring-draw" cx={59} cy={59} r={r} fill="none" stroke={bad ? 'var(--bad)' : 'var(--ring)'} strokeWidth={12} strokeLinecap="round"
-        strokeDasharray={`${shown} ${full}`} transform="rotate(-90 59 59)" style={{ ['--ring-full' as string]: `${shown}` }} />}
-      <text x={59} y={57} textAnchor="middle" fill="var(--ink)" style={{ font: '800 24px var(--font-sans)' }}>{pct(Math.max(rate, 0))}</text>
-      <text x={59} y={75} textAnchor="middle" fill="var(--muted)" style={{ font: '400 11px var(--font-sans)' }}>{lang === 'he' ? 'מההכנסה' : 'of income'}</text>
-    </svg>
-  );
-}
-
-export function MonthHero({ a }: { a: MonthAnalysis }) {
-  const lang = useLang();
-  const L = (he: string, en: string) => (lang === 'he' ? he : en);
-  const hasIncome = a.income > 0;
-  const saved = Math.max(a.leftover, 0);
-  const met = a.target.invest > 0 && saved >= a.target.invest;
-  return (
-    <div>
-      <div className="flex items-center gap-4">
-        {hasIncome && <SavingsRing rate={a.savingsRate ?? 0} bad={a.leftover < 0} />}
-        <div className="min-w-0">
-          <p className="text-[13px] text-muted">{!hasIncome ? L('הוצאת החודש', 'You spent this month') : a.leftover >= 0 ? L('חסכת החודש', 'You saved this month') : L('חרגת מההכנסה ב-', 'You overspent by')}</p>
-          <CountMoney value={hasIncome ? Math.abs(a.leftover) : a.totalSpent} className={cx('block text-[34px] font-extrabold leading-tight tracking-tight', hasIncome && a.leftover < 0 && 'text-bad')} />
-          {hasIncome && a.leftover >= 0 && a.target.invest > 0 && (
-            <span className={cx('mt-1.5 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold', met ? 'bg-accent-soft text-[var(--accent-ink)]' : 'bg-surface2 text-warn')}>
-              {met ? L(`✓ מעל היעד של ${a.split.invest}%`, `✓ Above the ${a.split.invest}% target`) : L(`חסרים ${money(a.target.invest - saved, lang)} ליעד`, `${money(a.target.invest - saved, lang)} short of target`)}
-            </span>
-          )}
-        </div>
-      </div>
-      {(['needs', 'wants'] as const).map((b) => {
-        const actual = a.spent[b], target = a.target[b], left = target - actual;
-        return (
-          <div key={b} className="mt-4">
-            <div className="flex items-baseline justify-between gap-3 text-sm">
-              <span className="flex items-center gap-2"><Dot color={BUCKET_COLOR[b]} />{bucketName(b, lang)}</span>
-              <Money value={actual} className="font-bold" />
-            </div>
-            {target > 0 && (
-              <>
-                <p className={cx('mb-1.5 text-[12.5px]', left < 0 ? 'text-bad' : 'text-muted')}>
-                  {left >= 0 ? L(`נשארו ${money(left, lang)} מתוך ${money(target, lang)}`, `${money(left, lang)} left of ${money(target, lang)}`) : L(`חריגה של ${money(-left, lang)} מעל ${money(target, lang)}`, `${money(-left, lang)} over ${money(target, lang)}`)}
-                </p>
-                <Meter value={actual} target={target} color={BUCKET_COLOR[b]} soft="var(--track)" label={`${bucketName(b, lang)}: ${money(actual, lang)} ${L('מתוך', 'of')} ${money(target, lang)}`} />
-              </>
-            )}
-          </div>
-        );
-      })}
-    </div>
   );
 }

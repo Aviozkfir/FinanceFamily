@@ -30,7 +30,7 @@ export default function HistoryPage() {
           {L('אחרי שתמלא חודש ראשון הוא יופיע כאן.', 'Once you fill in your first month it will appear here.')}
         </Empty>
       ) : (
-        <ul className="grid gap-3 md:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-3 md:grid-cols-2">
           {months.map((m) => {
             const has = m.txs.length > 0 || m.manual.length > 0;
             const a = analyzeMonth(m, db);

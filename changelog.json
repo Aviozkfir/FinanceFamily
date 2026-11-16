@@ -1,5 +1,21 @@
 [
   {
+    "version": "1.10.0",
+    "date": "2026-11-16",
+    "he": [
+      "חזרה לעיצוב הקודם. הערכה הבהירה היא עכשיו בגוון שמנת במקום לבן.",
+      "מסך הבית מינימלי: תאריך, ברכה ושתי פעולות — ניתוח החודש האחרון ויעד לחודש הנוכחי.",
+      "הסרגל התחתון הוחלף בתפריט בראש המסך, וההגדרות נמצאות בתוכו.",
+      "תוקן: במסך היעד האפליקציה כבר לא זזה הצידה בטלפונים צרים."
+    ],
+    "en": [
+      "Back to the previous design. The light theme is now cream instead of white.",
+      "A minimal home screen: the date, a greeting and two actions — analyze last month and set a goal for the current month.",
+      "The bottom bar is replaced by a menu at the top, with Settings inside it.",
+      "Fixed: the goal screen no longer makes the app slide sideways on narrow phones."
+    ]
+  },
+  {
     "version": "1.9.1",
     "date": "2026-11-16",
     "he": [

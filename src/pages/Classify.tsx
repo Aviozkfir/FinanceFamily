@@ -197,8 +197,8 @@ export default function ClassifyPage() {
           </Zone>
 
           {/* Categories */}
-          <div className="p-4 pb-28 lg:overflow-y-auto lg:pb-4">
-            <div className="grid gap-3 sm:grid-cols-2">
+          <div className="p-4 pb-24 lg:overflow-y-auto lg:pb-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {cats.map((c, idx) => {
                 const inCat = items.filter((i) => i.categoryId === c.id);
                 return (
