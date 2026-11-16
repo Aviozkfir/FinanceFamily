@@ -1,11 +1,11 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { DndContext, DragOverlay, MouseSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
-import { Check, CheckCheck, Globe, Layers, Pencil, Plus, Repeat, Search, Sparkles, Trash2, Wand2, X } from 'lucide-react';
+import { ArrowLeftRight, Check, CheckCheck, Globe, Layers, Pencil, Plus, Repeat, Search, Sparkles, Trash2, Wand2, X } from 'lucide-react';
 import type { BucketId, Category, Tx } from '../lib/types';
 import { bucketName, categoryName, emptyMonth, useL, useLang, useStore } from '../lib/store';
 import { dayLabel, isMonthKey, merchantKey, money, monthLabel } from '../lib/format';
-import { sourceOf, type Source } from '../lib/learn';
+import { isTransfer, sourceOf, type Source } from '../lib/learn';
 import { BUCKET_COLOR, Button, Dot, IconButton, Modal, Money, Segmented, TextInput, cx } from '../components/ui';
 
 /** `source` is the least certain one among the item's transactions, so one guess marks the whole bubble. */
@@ -42,6 +42,7 @@ function BubbleBody({ item, color, selected, overlay, extra }: { item: Item; col
       {item.txs.length > 1 && <span className="rounded-full bg-surface3 px-1.5 text-[11px] text-ink2">×{item.txs.length}</span>}
       {item.txs.some((t) => t.standing) && <Repeat size={12} className="shrink-0 text-muted" />}
       {item.txs.some((t) => t.abroad) && <Globe size={12} className="shrink-0 text-muted" />}
+      {isTransfer(item.merchant) && <ArrowLeftRight size={12} className="shrink-0 text-muted" />}
       {item.txs.length === 1 && t0.installment && <span className="text-[11px] text-muted" dir="ltr">{t0.installment.n}/{t0.installment.of}</span>}
       <span dir="ltr" className={cx('num shrink-0 font-bold', item.amount < 0 && 'text-good')}>{money(item.amount, lang, true)}</span>
       {extra ? <span className="rounded-full bg-accent px-1.5 text-[11px] font-bold text-page">+{extra}</span> : null}
@@ -232,6 +233,7 @@ export default function ClassifyPage() {
           <div className="rise fixed inset-x-3 bottom-4 z-40 mx-auto flex max-w-3xl flex-wrap items-center gap-2 rounded-2xl border border-line-strong bg-surface3 p-3 shadow-2xl">
             <span className="me-1 text-sm font-semibold">{L(`${selected.size} נבחרו`, `${selected.size} selected`)} · <Money value={selAmount} /></span>
             {selItems.some((i) => i.source === 'guess') && <span className="w-full text-[13px] text-warn">{selHint ? <>{L('ניחוש לפי', 'Guessed from')} <bdi>{selHint}</bdi></> : L('ניחוש — אשר, או העבר לקטגוריה הנכונה', 'A guess — confirm it, or move it to the right category')}</span>}
+            {selItems.length > 0 && selItems.every((i) => isTransfer(i.merchant)) && <span className="w-full text-[13px] text-ink2">{L('העברה: כל פעם היא על משהו אחר, אז האפליקציה לא מנחשת ולא זוכרת. בחר לפי מה שהיא שילמה, או "לא לספור" אם הכסף רק עבר בין חשבונות.', 'A transfer: it pays for something different each time, so the app does not guess or remember. Choose by what it paid for, or "don\'t count" if the money only moved between accounts.')}</span>}
             {selUnconfirmed && selItems.every((i) => i.categoryId) && (
               <button onClick={() => { confirm(key, idsFor(selected)); setSelected(new Set()); }} className="flex items-center gap-1.5 rounded-full bg-ink px-3 py-1.5 text-[13px] font-semibold text-page">
                 <Check size={14} />{L('נכון, אשר', 'Correct, confirm')}

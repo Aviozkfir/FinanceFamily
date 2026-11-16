@@ -1,5 +1,15 @@
 [
   {
+    "version": "1.6.2",
+    "date": "2026-11-16",
+    "he": [
+      "העברות בביט ובפייבוקס כבר לא מסווגות אוטומטית: כל העברה היא על משהו אחר, אז האפליקציה משאירה לך לבחור ומסבירה למה."
+    ],
+    "en": [
+      "Bit and PayBox transfers are no longer classified automatically: each one pays for something different, so the app leaves the choice to you and explains why."
+    ]
+  },
+  {
     "version": "1.6.1",
     "date": "2026-11-16",
     "he": [

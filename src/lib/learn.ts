@@ -10,6 +10,7 @@
 //   - a known merchant with a very similar name ("שופרסל דיל" → "שופרסל אונליין");
 //   - a word that the user's own merchants agree on ("מסעדת …" → wants);
 //   - the built-in list of common Israeli merchants.
+// Transfers through payment apps are the exception: always left for the user (see isTransfer).
 // All of those are a 'guess'. Guesses are never used as evidence, so the model cannot talk
 // itself into a mistake: only choices the user made or confirmed count.
 import type { DB, Tx } from './types';
@@ -20,6 +21,12 @@ import { presetBucket, presetCategoryId } from './presets';
 /** Who decided a transaction's category. */
 export type Source = 'user' | 'learned' | 'guess';
 export const sourceOf = (t: Pick<Tx, 'categoryId' | 'by'>): Source | null => (t.categoryId ? t.by ?? 'user' : null);
+
+/**
+ * Payment apps and transfers (Bit, PayBox): the name says how the money moved, not what it paid
+ * for, and that differs every time. They are never classified automatically and never learned.
+ */
+export const isTransfer = (merchant: string) => /(^|[\s-])(bit|ביט|paybox|פייבוקס|pay box)([\s-]|$)|העברה/i.test(merchantKey(merchant));
 
 export interface Suggestion { categoryId: string; by: 'learned' | 'guess'; hint?: string }
 
@@ -59,7 +66,7 @@ export function buildModel(db: DB): Model {
   const decisions = new Map<string, { name: string; months: Map<string, string[]> }>();
   for (const key of Object.keys(db.months).sort()) {
     for (const t of db.months[key].txs) {
-      if (sourceOf(t) !== 'user' || !valid.has(t.categoryId!)) continue;
+      if (sourceOf(t) !== 'user' || !valid.has(t.categoryId!) || isTransfer(t.merchant)) continue;
       const k = merchantKey(t.merchant);
       const d = decisions.get(k) ?? { name: t.merchant, months: new Map() };
       d.months.set(key, [...(d.months.get(key) ?? []), t.categoryId!]);
@@ -92,6 +99,7 @@ export function buildModel(db: DB): Model {
 }
 
 export function suggest(model: Model, merchant: string): Suggestion | null {
+  if (isTransfer(merchant)) return null;
   const key = merchantKey(merchant);
   const exact = model.known.get(key);
   if (exact) return { categoryId: exact.categoryId, by: exact.steady ? 'learned' : 'guess' };
