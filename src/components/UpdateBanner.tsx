@@ -1,0 +1,32 @@
+import { Download, RefreshCw } from 'lucide-react';
+import { useL } from '../lib/store';
+import { installUpdate, useUpdate } from '../lib/update';
+import { Button } from './ui';
+
+/** Shown on the phone when a newer version was published. */
+export default function UpdateBanner() {
+  const L = useL();
+  const u = useUpdate();
+  if (u.phase === 'idle' || u.phase === 'checking' || !u.latest) return null;
+  const busy = u.phase !== 'available';
+  return (
+    <div role="status" className="mx-4 mt-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-accent bg-accent-soft px-4 py-2.5 text-sm lg:mx-8">
+      <RefreshCw size={16} className={busy ? 'shrink-0 animate-spin text-accent' : 'shrink-0 text-accent'} />
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold">
+          {u.phase === 'available' && L(`גרסה חדשה זמינה: ${u.latest.version}`, `A new version is available: ${u.latest.version}`)}
+          {u.phase === 'downloading' && L(`מוריד את העדכון… ${u.percent ?? 0}%`, `Downloading the update… ${u.percent ?? 0}%`)}
+          {u.phase === 'installing' && L('אשר את ההתקנה בחלון של אנדרואיד', 'Confirm the installation in the Android window')}
+          {u.phase === 'restarting' && L('מפעיל מחדש…', 'Restarting…')}
+        </p>
+        {u.phase === 'available' && u.kind === 'apk' && !u.error && (
+          <p className="text-[13px] text-ink2">{L('העדכון הזה מותקן דרך אנדרואיד: אשר את ההתקנה ואז לחץ "פתח". הנתונים נשמרים.', 'This update installs through Android: confirm it, then tap "Open". Your data is kept.')}</p>
+        )}
+        {u.error === 'failed' && <p className="text-[13px] text-bad">{L('העדכון נכשל. נסה שוב.', 'The update failed. Try again.')}{u.detail ? ` (${u.detail})` : ''}</p>}
+      </div>
+      {u.phase === 'available' && (
+        <Button size="sm" variant="primary" icon={<Download size={15} />} onClick={() => void installUpdate()}>{L('עדכן', 'Update')}</Button>
+      )}
+    </div>
+  );
+}

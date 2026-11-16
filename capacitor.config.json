@@ -1,0 +1,8 @@
+{
+  "appId": "com.aviozkfir.financefamily",
+  "appName": "הכסף שלי",
+  "webDir": "dist",
+  "android": {
+    "path": "deploy/android"
+  }
+}

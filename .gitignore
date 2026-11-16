@@ -1,0 +1,9 @@
+node_modules
+dist
+data
+*.xlsx
+*.xls
+
+# Android packaging: build tools and built packages stay local
+deploy/.toolchain
+deploy/out

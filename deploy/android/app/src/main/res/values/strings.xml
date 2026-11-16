@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">הכסף שלי</string>
+    <string name="title_activity_main">הכסף שלי</string>
+    <string name="package_name">com.aviozkfir.financefamily</string>
+    <string name="custom_url_scheme">com.aviozkfir.financefamily</string>
+</resources>
