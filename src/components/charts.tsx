@@ -286,3 +286,45 @@ export function RankBars({ rows, lang }: { rows: { key: string; label: string; s
     </div>
   );
 }
+
+// ---------- the month in one picture: where the income went, against the plan ----------
+/**
+ * One bar the width of the income, cut into needs, wants and what was saved, with the planned
+ * split drawn right under it on the same scale. When spending passed the income the bar runs
+ * past a marked "income" line instead.
+ */
+export function MonthPicture({ a }: { a: MonthAnalysis }) {
+  const lang = useLang();
+  const L = (he: string, en: string) => (lang === 'he' ? he : en);
+  const scale = Math.max(a.income, a.totalSpent, 1);
+  const w = (v: number) => `${(Math.max(v, 0) / scale) * 100}%`;
+  const actual = [
+    { id: 'needs', label: bucketName('needs', lang), value: a.spent.needs, color: BUCKET_COLOR.needs },
+    { id: 'wants', label: bucketName('wants', lang), value: a.spent.wants, color: BUCKET_COLOR.wants },
+    { id: 'un', label: L('לא מסווג', 'Unclassified'), value: a.unclassified.total, color: 'var(--neutral-mark)' },
+    { id: 'invest', label: bucketName('invest', lang), value: a.spent.invest, color: BUCKET_COLOR.invest },
+  ].filter((x) => x.value > 0);
+  const planned = a.basis === 'none' ? [] : SPEND_BUCKETS.map((b) => ({ id: b, label: bucketName(b, lang), value: a.target[b], color: BUCKET_COLOR[b] })).filter((x) => x.value > 0);
+  const over = a.income > 0 && a.totalSpent > a.income;
+  const row = 'flex gap-0.5 overflow-hidden rounded-md';
+  return (
+    <div>
+      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5 text-xs text-muted">
+        <span>{L('בפועל', 'Actual')}</span>
+        <div className="relative">
+          <div className={cx(row, 'h-7')}>
+            {actual.map((x) => <div key={x.id} title={`${x.label} · ${money(x.value, lang)}`} style={{ width: w(x.value), background: x.color }} />)}
+          </div>
+          {over && <div className="absolute -inset-y-1 w-0.5 rounded bg-ink" style={{ insetInlineStart: w(a.income) }} title={L('הכנסה', 'Income')} />}
+        </div>
+        {planned.length > 0 && <>
+          <span>{L('יעד', 'Plan')}</span>
+          <div className={cx(row, 'h-2.5')}>
+            {planned.map((x) => <div key={x.id} className="opacity-50" title={`${x.label} · ${money(x.value, lang)}`} style={{ width: w(x.value), background: x.color }} />)}
+          </div>
+        </>}
+      </div>
+      {over && <p className="mt-2 text-[13px] text-ink2">{L('הקו מסמן את ההכנסה — ההוצאות עברו אותו.', 'The line marks your income — spending went past it.')}</p>}
+    </div>
+  );
+}

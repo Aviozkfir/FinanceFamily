@@ -5,7 +5,7 @@ import { bucketName } from '../store';
 import { SMALL_PURCHASE, type MonthAnalysis } from './compute';
 
 export type Tone = 'good' | 'warn' | 'bad' | 'info';
-export interface Insight { id: string; tone: Tone; title: string; body: string }
+export interface Insight { id: string; tone: Tone; title: string; body: string; /** Shekels involved — how much this matters. */ weight?: number }
 
 export function buildInsights(a: MonthAnalysis, prev: MonthAnalysis | null, lang: Lang): Insight[] {
   const L = (he: string, en: string) => (lang === 'he' ? he : en);
@@ -170,6 +170,28 @@ export function buildInsights(a: MonthAnalysis, prev: MonthAnalysis | null, lang
     }
   }
 
+  const sum = (xs: { amount: number }[]) => xs.reduce((t, x) => t + x.amount, 0);
+  const weights: Record<string, number> = {
+    'over-needs': a.spent.needs - a.target.needs,
+    'over-wants': a.spent.wants - a.target.wants,
+    'vs-prev': prev ? Math.abs(a.totalSpent - prev.totalSpent) : 0,
+    // Facts rather than problems weigh half, so a real overrun comes first.
+    'top-merchant': (a.merchants[0]?.total ?? 0) / 2,
+    frequent: (frequent?.total ?? 0) / 2,
+    standing: sum(a.standing),
+    installments: sum(a.installments.filter((i) => i.remaining > 0)),
+    small: a.small.total,
+    refunds: -a.refunds.total / 2,
+    abroad: a.abroad.total / 2,
+  };
+  for (const i of out) i.weight = weights[i.id] ?? 0;
+
   const order: Record<Tone, number> = { bad: 0, warn: 1, good: 2, info: 3 };
   return out.sort((x, y) => order[x.tone] - order[y.tone]);
 }
+
+/** What the main picture of the month already says; repeating it as an insight is noise. */
+const IN_PICTURE = new Set(['unclassified', 'guessed', 'balance', 'ok-needs', 'ok-wants', 'savings']);
+/** The few insights worth reading: not already in the picture, most money first. */
+export const topInsights = (all: Insight[], n = 3): Insight[] =>
+  all.filter((i) => !IN_PICTURE.has(i.id) && (i.weight ?? 0) > 0).sort((x, y) => (y.weight ?? 0) - (x.weight ?? 0)).slice(0, n);
