@@ -1,5 +1,19 @@
 [
   {
+    "version": "1.3.0",
+    "date": "2026-11-16",
+    "he": [
+      "מסך הניתוח נבנה מחדש סביב תמונה אחת: כמה חסכת, ופס אחד שמראה לאן הלכה ההכנסה מול היעד.",
+      "עד שלוש תובנות בלבד, לפי גודל הסכום. לחיצה על בית עסק מציגה את העסקאות שלו.",
+      "מנויים והוראות קבע מוצגים עם העלות השנתית."
+    ],
+    "en": [
+      "The analysis screen is rebuilt around one picture: how much you saved, and one bar showing where your income went against the plan.",
+      "At most three insights, chosen by the amount involved. Tapping a merchant shows its transactions.",
+      "Subscriptions and standing orders are shown with their yearly cost."
+    ]
+  },
+  {
     "version": "1.2.2",
     "date": "2026-11-16",
     "he": [
