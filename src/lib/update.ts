@@ -11,7 +11,11 @@ import { useSyncExternalStore } from 'react';
 import { registerPlugin, type PluginListenerHandle } from '@capacitor/core';
 import { isNative } from './platform';
 
-export interface AppVersion { version: string; build: number; native: number; commit: string; date: string }
+export interface AppVersion {
+  version: string; build: number; native: number; commit: string; date: string;
+  /** What changed in this version; present on a published version read from GitHub. */
+  notes?: { he: string[]; en: string[] } | null;
+}
 declare const __APP_VERSION__: AppVersion;
 /** The version of the code that is running right now. */
 export const CURRENT: AppVersion = __APP_VERSION__;

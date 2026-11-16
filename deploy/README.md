@@ -45,8 +45,13 @@ To release a new version name:
 
 ```
 npm version minor --no-git-tag-version   # or patch / major; edits package.json
+# add an entry for the new version at the top of changelog.json (he and en lines)
 git commit -am "Version 1.2.0" && git push
 ```
+
+`changelog.json` is the one place that says what changed: the app shows the entry in the update
+banner, once after updating, and in Settings, and the build copies it into the release notes.
+The build fails if the version has no entry.
 
 The action then also creates a permanent `v1.2.0` release with that APK. Pushes that do not change
 the version still reach the phones as updates (same name, higher build).

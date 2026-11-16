@@ -5,6 +5,7 @@ import { useL, useStore } from './lib/store';
 import { currentMonth, shiftMonth } from './lib/format';
 import { cx } from './components/ui';
 import UpdateBanner from './components/UpdateBanner';
+import WhatsNew from './components/WhatsNew';
 import { startUpdates } from './lib/update';
 import Home from './pages/Home';
 import GoalPage from './pages/Goal';
@@ -87,6 +88,7 @@ export default function App() {
           </div>
         )}
         {!fullscreen && <UpdateBanner />}
+        {!fullscreen && <WhatsNew />}
         {offline && (
           <div className="mx-4 mt-3 flex items-center gap-2 rounded-xl border border-line bg-surface2 px-4 py-2.5 text-sm text-warn lg:mx-8">
             <CloudOff size={16} />{L('השרת המקומי לא זמין — השינויים נשמרים בדפדפן בלבד. הפעל את האפליקציה דרך start.bat.', 'The local server is unreachable — changes are saved in this browser only. Start the app with start.bat.')}

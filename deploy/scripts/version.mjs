@@ -8,8 +8,13 @@
 //            When it is higher than the installed app's, the update needs a new APK;
 //            otherwise the app only swaps its web content.
 //
+//   notes    what changed in this version, from changelog.json at the repo root (he / en lines).
+//            It travels in the release notes, so an app can show it before updating.
+//
 //   node deploy/scripts/version.mjs            prints the values as JSON
-//   node deploy/scripts/version.mjs --github   prints key=value lines for $GITHUB_OUTPUT
+//   node deploy/scripts/version.mjs --github   prints key=value lines for $GITHUB_OUTPUT;
+//                                              fails when the version has no changelog entry
+//   node deploy/scripts/version.mjs --notes    prints the changelog entry as release-note text
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -41,12 +46,28 @@ export function getVersion() {
   };
 }
 
+/** The changelog entry of the current version: { he: string[], en: string[] }, or null. */
+export function getNotes() {
+  const { version } = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
+  const entry = JSON.parse(fs.readFileSync(path.join(root, 'changelog.json'), 'utf8')).find((e) => e.version === version);
+  return entry?.he?.length && entry?.en?.length ? { he: entry.he, en: entry.en } : null;
+}
+
 /** Flags that hand the version to Gradle. */
 export const gradleArgs = (v = getVersion()) => [`-PappVersionName=${v.version}`, `-PappVersionCode=${v.build || 1}`, `-PnativeLevel=${v.native}`];
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const v = getVersion();
-  if (process.argv.includes('--github')) {
-    console.log(Object.entries({ ...v, json: JSON.stringify(v), gradle: gradleArgs(v).join(' ') }).map(([k, val]) => `${k}=${val}`).join('\n'));
-  } else console.log(JSON.stringify(v, null, 2));
+  const notes = getNotes();
+  if (process.argv.includes('--notes') || process.argv.includes('--github')) {
+    if (!notes) {
+      console.error(`changelog.json has no entry for version ${v.version}. Add one (he and en lines) before releasing.`);
+      process.exit(1);
+    }
+  }
+  if (process.argv.includes('--notes')) {
+    console.log([...notes.en.map((l) => `- ${l}`), '', ...notes.he.map((l) => `- ${l}`)].join('\n'));
+  } else if (process.argv.includes('--github')) {
+    console.log(Object.entries({ ...v, json: JSON.stringify({ ...v, notes }), gradle: gradleArgs(v).join(' ') }).map(([k, val]) => `${k}=${val}`).join('\n'));
+  } else console.log(JSON.stringify({ ...v, notes }, null, 2));
 }

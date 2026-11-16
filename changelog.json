@@ -1,0 +1,52 @@
+[
+  {
+    "version": "1.2.1",
+    "date": "2026-11-16",
+    "he": [
+      "מה חדש: לפני עדכון רואים מה הוא כולל, ואחרי עדכון מוצג סיכום קצר של השינויים.",
+      "כל ההיסטוריה של הגרסאות נמצאת בהגדרות."
+    ],
+    "en": [
+      "What's new: you see what an update contains before installing it, and a short summary of the changes afterwards.",
+      "The full version history is in Settings."
+    ]
+  },
+  {
+    "version": "1.2.0",
+    "date": "2026-11-16",
+    "he": [
+      "האפליקציה לומדת ממך: בתי עסק שכבר סיווגת מסווגים לבד, וחדשים מקבלים ניחוש שמסומן ב-? עד שתאשר.",
+      "חיסכון הוא מה שנשאר מההכנסה אחרי ההוצאות. עסקאות אשראי מסווגות רק לצרכים, רצונות או \"לא לספור\".",
+      "העוזר של Claude הוסר. אין צורך במפתח API, והנתונים נשארים במכשיר."
+    ],
+    "en": [
+      "The app learns from you: merchants you already classified are placed automatically, and new ones get a guess marked with ? until you confirm.",
+      "Savings is what is left of your income after spending. Card transactions are classified only as needs, wants or \"don't count\".",
+      "The Claude assistant was removed. No API key is needed, and your data stays on the device."
+    ]
+  },
+  {
+    "version": "1.1.1",
+    "date": "2026-11-16",
+    "he": [
+      "גרסת בדיקה למנגנון העדכון. אין שינוי באפליקציה עצמה."
+    ],
+    "en": [
+      "A test release for the update mechanism. Nothing changed in the app itself."
+    ]
+  },
+  {
+    "version": "1.1.0",
+    "date": "2026-11-16",
+    "he": [
+      "אפשר להעלות דפי חיוב גם בקובצי CSV, לא רק Excel.",
+      "עדכונים מתוך האפליקציה: כשיש גרסה חדשה מופיע כפתור עדכון.",
+      "מספר הגרסה מוצג בהגדרות."
+    ],
+    "en": [
+      "Statements can be uploaded as CSV files, not only Excel.",
+      "In-app updates: an Update button appears when a new version is out.",
+      "The version number is shown in Settings."
+    ]
+  }
+]

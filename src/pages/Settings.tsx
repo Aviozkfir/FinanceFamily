@@ -6,6 +6,7 @@ import { bucketName, useL, useLang, useStore } from '../lib/store';
 import { isNative } from '../lib/platform';
 import { buildModel } from '../lib/learn';
 import { CURRENT, checkForUpdate, installUpdate, useUpdate } from '../lib/update';
+import { CHANGELOG, linesOf } from '../lib/changelog';
 import { BUCKET_COLOR, Button, Card, CardTitle, Dot, IconButton, PageHeader, Pill, Segmented, TextInput, cx } from '../components/ui';
 
 export default function SettingsPage() {
@@ -97,6 +98,17 @@ export default function SettingsPage() {
           <span className="font-semibold">{L('גרסה', 'Version')} <bdi dir="ltr">{CURRENT.version}</bdi></span>
           {CURRENT.build > 0 && <span className="text-muted"> · <bdi dir="ltr">{L('בנייה', 'build')} {CURRENT.build} · {CURRENT.commit} · {CURRENT.date.slice(0, 10)}</bdi></span>}
         </p>
+        <details className="mt-3 text-sm">
+          <summary className="cursor-pointer font-medium text-accent">{L('מה חדש בכל גרסה', 'What changed in each version')}</summary>
+          <div className="mt-2 space-y-3">
+            {CHANGELOG.map((e) => (
+              <div key={e.version}>
+                <p className="font-semibold"><bdi dir="ltr">{e.version}</bdi> <span className="font-normal text-muted">· <bdi dir="ltr">{e.date}</bdi></span></p>
+                <ul className="mt-1 list-disc space-y-1 ps-5 text-ink2">{linesOf(e, lang).map((line) => <li key={line}>{line}</li>)}</ul>
+              </div>
+            ))}
+          </div>
+        </details>
         {native && (
           <>
             <div className="mt-3 flex flex-wrap items-center gap-2">

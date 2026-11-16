@@ -79,6 +79,8 @@ jobs:
           # The comment line is what installed apps read (src/lib/update.ts); keep its format.
           notes="Version $VERSION, build $BUILD, from commit ${GITHUB_SHA::7} on $(date -u +'%Y-%m-%d %H:%M UTC'). Download FinanceFamily.apk below and open it on the phone. Installed apps update themselves from bundle.zip.
 
+          $(node deploy/scripts/version.mjs --notes)
+
           <!-- update-manifest $MANIFEST -->"
           if gh release view latest-apk > /dev/null 2>&1; then
             # Files first, notes last: an app must not learn about a build before its files are there.
@@ -96,5 +98,5 @@ jobs:
           BUILD: ${{ steps.version.outputs.build }}
         run: |
           if ! gh release view "v$VERSION" > /dev/null 2>&1; then
-            gh release create "v$VERSION" FinanceFamily.apk bundle.zip --target "$GITHUB_SHA" --title "v$VERSION" --notes "Version $VERSION (build $BUILD)."
+            gh release create "v$VERSION" FinanceFamily.apk bundle.zip --target "$GITHUB_SHA" --title "v$VERSION" --notes "$(node deploy/scripts/version.mjs --notes)"
           fi
