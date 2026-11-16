@@ -6,7 +6,8 @@
 /* Two skins of one design.
    Light is cream rather than white: easier on the eye, and the colors sit warmer on it.
    Dark is a deep blue-black with one lime accent. Lime cannot be seen on cream, so the light
-   theme draws its accent in a deep olive and keeps the lime as the text of its dark buttons.
+   theme has none of it: its buttons are coffee brown, from the cream's own family, and the one
+   color that draws the eye is the savings green of the ring.
    The three series colors of each theme pass the colorblind and contrast checks on its surface. */
 :root {
   color-scheme: light;
@@ -20,11 +21,13 @@
   --ink: #1c1a15;
   --ink2: #4a453a;
   --muted: #6f6859;
-  --accent: #4f7a00;
-  --accent-ink: #3f6200;
-  --accent-soft: rgba(79, 122, 0, 0.13);
-  --btn: #1c1a15;
-  --btn-ink: #c5f24e;
+  --accent: #0f6b4a;
+  --accent-ink: #0f6b4a;
+  --accent-soft: rgba(22, 148, 103, 0.13);
+  --ring: #169467;
+  --btn: #3a2c22;
+  --btn-ink: #fbf7ef;
+  --nav-on: #3a2c22;
   --track: rgba(28, 26, 21, 0.09);
   --needs: #2b6fd0;
   --wants: #db5a26;
@@ -54,8 +57,10 @@
   --accent: #c5f24e;
   --accent-ink: #c5f24e;
   --accent-soft: rgba(197, 242, 78, 0.14);
+  --ring: #c5f24e;
   --btn: #c5f24e;
   --btn-ink: #0a0c11;
+  --nav-on: #c5f24e;
   --track: rgba(255, 255, 255, 0.09);
   --needs: #3987e5;
   --wants: #d95926;

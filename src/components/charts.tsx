@@ -363,7 +363,7 @@ function SavingsRing({ rate, bad }: { rate: number; bad?: boolean }) {
   return (
     <svg width={112} height={112} viewBox="0 0 118 118" className="shrink-0" role="img" aria-label={`${pct(rate)} ${lang === 'he' ? 'מההכנסה נחסכו' : 'of income saved'}`}>
       <circle cx={59} cy={59} r={r} fill="none" stroke="var(--track)" strokeWidth={12} />
-      {shown > 0 && <circle className="ring-draw" cx={59} cy={59} r={r} fill="none" stroke={bad ? 'var(--bad)' : 'var(--accent)'} strokeWidth={12} strokeLinecap="round"
+      {shown > 0 && <circle className="ring-draw" cx={59} cy={59} r={r} fill="none" stroke={bad ? 'var(--bad)' : 'var(--ring)'} strokeWidth={12} strokeLinecap="round"
         strokeDasharray={`${shown} ${full}`} transform="rotate(-90 59 59)" style={{ ['--ring-full' as string]: `${shown}` }} />}
       <text x={59} y={57} textAnchor="middle" fill="var(--ink)" style={{ font: '800 24px var(--font-sans)' }}>{pct(Math.max(rate, 0))}</text>
       <text x={59} y={75} textAnchor="middle" fill="var(--muted)" style={{ font: '400 11px var(--font-sans)' }}>{lang === 'he' ? 'מההכנסה' : 'of income'}</text>

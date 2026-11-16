@@ -61,7 +61,7 @@ export default function App() {
       {!fullscreen && (
         <aside className="fixed inset-y-0 start-0 z-30 hidden w-60 flex-col border-e border-line bg-surface/70 p-4 backdrop-blur-xl lg:flex">
           <div className="mb-8 flex items-center gap-2.5 px-2 pt-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-ink text-page"><TrendingUp size={18} strokeWidth={2.6} /></span>
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--btn)] text-[var(--btn-ink)]"><TrendingUp size={18} strokeWidth={2.6} /></span>
             <span className="text-lg font-bold tracking-tight">{L('הכסף שלי', 'My Money')}</span>
           </div>
           <nav className="flex flex-1 flex-col gap-1">
@@ -79,7 +79,7 @@ export default function App() {
       <div className={cx(!fullscreen && 'lg:ps-60')}>
         {!fullscreen && (
           <div className="flex items-center justify-between px-4 pt-3 lg:hidden">
-            <span className="flex items-center gap-2 font-bold"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-ink text-page"><TrendingUp size={16} strokeWidth={2.6} /></span>{L('הכסף שלי', 'My Money')}</span>
+            <span className="flex items-center gap-2 font-bold"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--btn)] text-[var(--btn-ink)]"><TrendingUp size={16} strokeWidth={2.6} /></span>{L('הכסף שלי', 'My Money')}</span>
             {settingsLink}
           </div>
         )}
@@ -108,7 +108,7 @@ export default function App() {
       {!fullscreen && (
         <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-line bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden">
           {nav.map((n) => (
-            <NavLink key={n.to} to={n.to} className={cx('press flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs', active(n) ? 'font-bold text-[var(--accent-ink)]' : 'font-medium text-muted')}>
+            <NavLink key={n.to} to={n.to} className={cx('press flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs', active(n) ? 'font-bold text-[var(--nav-on)]' : 'font-medium text-muted')}>
               <n.icon size={21} key={String(active(n))} className={active(n) ? 'pop' : ''} /><span className="max-w-full truncate px-0.5">{n.label}</span>
             </NavLink>
           ))}
