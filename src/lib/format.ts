@@ -24,13 +24,19 @@ export const pct = (n: number, digits = 0) => `${(n * 100).toFixed(digits)}%`;
 // ----- months -----
 export const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 export const currentMonth = () => monthKey(new Date());
+/** The month before this one: the month to look back on, and where "analyze last month" goes. */
+export const previousMonth = (today = new Date()) => shiftMonth(monthKey(today), -1);
+
 /**
- * The month whose card statement is the latest one out. The statement of a month is charged on
- * the billing day, so before that day the latest statement is still last month's.
+ * The month a statement's spending belongs to: the month most of its purchases were made in.
+ * A statement charged on 10 November is mostly October's purchases, so it belongs to October.
+ * Installments are left out (their purchase date is the original one, often months back).
  */
-export function statementMonth(billingDay: number, today = new Date()): string {
-  const now = monthKey(today);
-  return today.getDate() >= billingDay ? now : shiftMonth(now, -1);
+export function spendingMonth(txs: { date: string; installment?: unknown }[], chargedIn?: string): string | undefined {
+  const count = new Map<string, number>();
+  for (const t of txs) if (!t.installment && t.date) count.set(t.date.slice(0, 7), (count.get(t.date.slice(0, 7)) ?? 0) + 1);
+  const top = [...count.entries()].sort((a, b) => b[1] - a[1])[0];
+  return top?.[0] ?? (chargedIn ? shiftMonth(chargedIn, -1) : undefined);
 }
 export function shiftMonth(key: string, by: number): string {
   const [y, m] = key.split('-').map(Number);

@@ -93,7 +93,7 @@ export default function SettingsPage() {
         </div>
       </Section>
 
-      <Section title={L('תקציב', 'Budget')} summary={<bdi>{L(`חלוקה ${s.split.needs}/${s.split.wants}/${s.split.invest} · חיוב ב-${s.billingDay} בחודש`, `Split ${s.split.needs}/${s.split.wants}/${s.split.invest} · charged on day ${s.billingDay}`)}</bdi>}>
+      <Section title={L('תקציב', 'Budget')} summary={<bdi>{L(`חלוקה ${s.split.needs}/${s.split.wants}/${s.split.invest}`, `Split ${s.split.needs}/${s.split.wants}/${s.split.invest}`)}</bdi>}>
         <p className="mb-3 text-[13px] text-muted">{L('החלוקה משמשת כשלא הוגדר יעד לחודש, וכברירת מחדל ליעדים חדשים.', 'The split is used when a month has no goal, and as the default for new goals.')}</p>
         <div className="grid max-w-md grid-cols-3 gap-3">
           {SPEND_BUCKETS.map((b) => (
@@ -104,11 +104,6 @@ export default function SettingsPage() {
                 <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-muted">%</span></div></label>
           ))}
         </div>
-        <label className="mt-4 block max-w-xs"><span className="mb-1.5 block text-sm text-ink2">{L('יום החיוב של כרטיס האשראי', 'Day the card is charged')}</span>
-          <input type="number" min={1} max={28} dir="ltr" value={s.billingDay}
-            onChange={(e) => setSettings({ billingDay: Math.max(1, Math.min(28, Math.round(Number(e.target.value) || 10))) })}
-            className="num h-10 w-24 rounded-xl border border-line bg-surface2 px-3 text-sm font-semibold focus:border-accent focus:outline-none" />
-          <span className="mt-1 block text-xs text-muted">{L('חודש באפליקציה הוא דף החיוב שיורד ביום הזה. מהיום הזה והלאה האפליקציה מציעה לסכם את החודש הנוכחי.', 'A month in the app is the statement charged on this day. From this day on, the app offers to wrap up the current month.')}</span></label>
         {splitSum !== 100 && <p role="alert" className="mt-3 text-sm text-bad">{L(`החלוקה מסתכמת ב-${splitSum}% — היא תישמר כשתגיע ל-100%.`, `The split adds up to ${splitSum}% — it is saved once it totals 100%.`)}</p>}
       </Section>
 

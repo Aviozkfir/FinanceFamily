@@ -2,15 +2,15 @@
 import { Link } from 'react-router-dom';
 import { ArrowLeft, ArrowRight, CalendarSearch, Check, Target } from 'lucide-react';
 import { sumItems, useL, useLang, useStore } from '../lib/store';
-import { money, monthLabel, shiftMonth, statementMonth } from '../lib/format';
+import { money, monthLabel, shiftMonth, previousMonth } from '../lib/format';
 import { Pill } from '../components/ui';
 
 export default function Home() {
   const L = useL();
   const lang = useLang();
   const db = useStore((s) => s.db);
-  // `last` is the month whose card statement is the latest one out; `current` is the one being lived now.
-  const last = statementMonth(db.settings.billingDay), current = shiftMonth(last, 1);
+  // `last` is the month just over, the one to analyze; `current` is the one being lived now.
+  const last = previousMonth(), current = shiftMonth(last, 1);
   const Arrow = lang === 'he' ? ArrowLeft : ArrowRight;
 
   const lastMonth = db.months[last];

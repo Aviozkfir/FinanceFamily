@@ -4,7 +4,7 @@ import { Check, Plus, Trash2 } from 'lucide-react';
 import type { IncomeItem, Split } from '../lib/types';
 import { SPEND_BUCKETS } from '../lib/types';
 import { bucketName, sumItems, useL, useLang, useStore } from '../lib/store';
-import { isMonthKey, monthLabel, shiftMonth, statementMonth, uid } from '../lib/format';
+import { isMonthKey, monthLabel, shiftMonth, previousMonth, uid } from '../lib/format';
 import { AmountInput, BUCKET_COLOR, Button, Card, CardTitle, Dot, IconButton, Money, MonthSwitcher, PageHeader, TextInput, cx } from '../components/ui';
 
 export function IncomeEditor({ items, onChange, placeholder }: { items: IncomeItem[]; onChange: (items: IncomeItem[]) => void; placeholder: string }) {
@@ -39,7 +39,7 @@ export default function GoalPage() {
   const lang = useLang();
   const db = useStore((s) => s.db);
   const { setGoal, clearGoal } = useStore();
-  const key = isMonthKey(month) ? month : shiftMonth(statementMonth(db.settings.billingDay), 1);
+  const key = isMonthKey(month) ? month : shiftMonth(previousMonth(), 1);
   const saved = db.months[key]?.goal;
 
   const [incomes, setIncomes] = useState<IncomeItem[]>([]);

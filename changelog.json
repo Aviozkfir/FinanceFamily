@@ -1,5 +1,17 @@
 [
   {
+    "version": "1.12.1",
+    "date": "2026-11-17",
+    "he": [
+      "\"ניתוח החודש האחרון\" ומילוי החודש נפתחים על החודש הקודם, והיעד על החודש הנוכחי.",
+      "דף חיוב משויך לחודש שבו נעשו רוב הרכישות שבו. אם הוא הועלה לחודש אחר, האפליקציה מציעה להעביר אותו."
+    ],
+    "en": [
+      "\"Analyze last month\" and filling in a month open on the previous month, and the goal on the current month.",
+      "A statement belongs to the month most of its purchases were made in. If it was uploaded to another month, the app offers to move it."
+    ]
+  },
+  {
     "version": "1.12.0",
     "date": "2026-11-17",
     "he": [

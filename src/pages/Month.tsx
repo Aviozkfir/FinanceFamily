@@ -9,7 +9,7 @@ import { ArrowLeft, ArrowLeftRight, ArrowRight, BarChart3, CalendarDays, Check, 
 import type { ManualItem, Tx } from '../lib/types';
 import { bucketName, categoryName, emptyMonth, offeredCategories, shownCategoryName, sumItems, useCardLabel, useL, useLang, useStore } from '../lib/store';
 import SwipeDeck from '../components/SwipeDeck';
-import { dayLabel, isMonthKey, merchantKey, monthLabel, shiftMonth, statementMonth, uid } from '../lib/format';
+import { dayLabel, isMonthKey, merchantKey, monthLabel, shiftMonth, previousMonth, uid, spendingMonth } from '../lib/format';
 import { parseStatementFile, type ParsedStatement } from '../lib/parser/statement';
 import { isTransfer, sourceOf } from '../lib/learn';
 import { AmountInput, BUCKET_COLOR, Button, Card, Dot, IconButton, Money, Segmented, TextInput, cx } from '../components/ui';
@@ -109,8 +109,8 @@ export default function MonthPage() {
   const cardLabel = useCardLabel();
   const [cardDraft, setCardDraft] = useState<Record<string, string>>({});
   const { setCardName, setIncomes, importStatements, removeFile, moveFile, setManual, setRepeat, applyRecurring, updateMonth, assign, confirm } = useStore();
-  // The month whose statement is the latest one out: the default, and where the home shortcut leads.
-  const latest = statementMonth(db.settings.billingDay);
+  // The month just over: the default, and where the home shortcut leads.
+  const latest = previousMonth();
   const key = isMonthKey(month) ? month : latest;
   const m = db.months[key] ?? emptyMonth(key);
   const Fwd = lang === 'he' ? ArrowLeft : ArrowRight;
@@ -309,7 +309,9 @@ export default function MonthPage() {
 
             {m.files.map((f) => {
               const verified = f.statedTotal != null && m.txs.filter((t) => t.fileId === f.id && !t.offCycle).reduce((s, t) => s + t.amount, 0).toFixed(2) === f.statedTotal.toFixed(2);
-              const mismatch = f.statementMonth && f.statementMonth !== key;
+              // Where this file's purchases belong, from the purchases themselves.
+              const belongs = spendingMonth(m.txs.filter((t) => t.fileId === f.id), f.statementMonth);
+              const mismatch = belongs && belongs !== key;
               return (
                 <Card key={f.id} className="pop !p-4">
                   <div className="flex items-center gap-3">
@@ -336,9 +338,9 @@ export default function MonthPage() {
                   {mismatch && (
                     <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-line pt-2 text-[13px] text-warn">
                       <TriangleAlert size={14} />
-                      {L(`הקובץ הוא של חיוב ${monthLabel(f.statementMonth!, lang)}, ואתה ממלא את ${monthLabel(key, lang)}.`, `This file is the ${monthLabel(f.statementMonth!, lang)} statement, and you are filling in ${monthLabel(key, lang)}.`)}
-                      <button className="font-semibold text-accent hover:underline" onClick={() => { moveFile(key, f.id, f.statementMonth!); navigate(`/month/${f.statementMonth}?s=2`); }}>
-                        {L(`העבר ל${monthLabel(f.statementMonth!, lang)}`, `Move to ${monthLabel(f.statementMonth!, lang)}`)}
+                      {L(`רוב הרכישות בקובץ הן מ${monthLabel(belongs!, lang)}, ואתה ממלא את ${monthLabel(key, lang)}.`, `Most purchases in this file are from ${monthLabel(belongs!, lang)}, and you are filling in ${monthLabel(key, lang)}.`)}
+                      <button className="font-semibold text-accent hover:underline" onClick={() => { moveFile(key, f.id, belongs!); navigate(`/month/${belongs}?s=2`); }}>
+                        {L(`העבר ל${monthLabel(belongs!, lang)}`, `Move to ${monthLabel(belongs!, lang)}`)}
                       </button>
                     </div>
                   )}

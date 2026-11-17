@@ -5,7 +5,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { ArrowDown, ArrowUp, Check, ChevronDown, CircleAlert, CircleCheck, Info, Pencil, TriangleAlert, CreditCard } from 'lucide-react';
 import type { SpendBucket, Tx } from '../lib/types';
 import { bucketName, emptyMonth, offeredCategories, shownCategoryName, useCardLabel, useL, useLang, useStore } from '../lib/store';
-import { dayLabel, isMonthKey, merchantKey, money, monthLabel, pct, statementMonth } from '../lib/format';
+import { dayLabel, isMonthKey, merchantKey, money, monthLabel, pct, previousMonth } from '../lib/format';
 import { analyzeMonth, previousAnalysis } from '../lib/analysis/compute';
 import { buildInsights, topInsights, type Tone } from '../lib/analysis/insights';
 import { sourceOf } from '../lib/learn';
@@ -41,7 +41,7 @@ export default function AnalysisPage() {
   const db = useStore((s) => s.db);
   const { assign } = useStore();
   const cardLabel = useCardLabel();
-  const key = isMonthKey(month) ? month : statementMonth(db.settings.billingDay);
+  const key = isMonthKey(month) ? month : previousMonth();
   const m = db.months[key] ?? emptyMonth(key);
 
   const a = useMemo(() => analyzeMonth(m, db), [m, db]);

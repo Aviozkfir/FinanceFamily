@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { CalendarRange, CloudOff, Home as HomeIcon, Menu, Settings as SettingsIcon, TrendingUp, X } from 'lucide-react';
 import { useL, useStore } from './lib/store';
-import { statementMonth } from './lib/format';
+import { previousMonth } from './lib/format';
 import { cx } from './components/ui';
 import UpdateBanner from './components/UpdateBanner';
 import WhatsNew from './components/WhatsNew';
@@ -20,9 +20,9 @@ import SettingsPage from './pages/Settings';
 
 export default function App() {
   const { ready, load, offline } = useStore();
-  const { lang, theme, billingDay } = useStore((s) => s.db.settings);
+  const { lang, theme } = useStore((s) => s.db.settings);
   // The month whose statement is the latest one out: where the Month tab goes.
-  const month = statementMonth(billingDay);
+  const month = previousMonth();
   const monthFilled = useStore((st) => { const m = st.db.months[month]; return !!m && (m.txs.length > 0 || m.manual.length > 0); });
   const L = useL();
   const { pathname } = useLocation();
