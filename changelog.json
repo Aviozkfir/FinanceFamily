@@ -1,5 +1,15 @@
 [
   {
+    "version": "1.11.1",
+    "date": "2026-11-17",
+    "he": [
+      "בחירת חודש בתוך מילוי החודש: לחיצה על שם החודש פותחת רשימה שמראה אילו חודשים מולאו. ברירת המחדל נשארת החודש האחרון."
+    ],
+    "en": [
+      "Choosing a month inside the month flow: tapping the month's name opens a list showing which months are filled. The default is still the latest month."
+    ]
+  },
+  {
     "version": "1.11.0",
     "date": "2026-11-17",
     "he": [

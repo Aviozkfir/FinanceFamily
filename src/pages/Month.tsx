@@ -5,13 +5,13 @@
 // The step lives in the address (?s=2), so the phone's back button walks back through the steps.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { ArrowLeft, ArrowLeftRight, ArrowRight, BarChart3, Check, ChevronLeft, ChevronRight, CreditCard, FileSpreadsheet, LayoutGrid, Plus, Repeat, Trash2, TriangleAlert, Upload } from 'lucide-react';
+import { ArrowLeft, ArrowLeftRight, ArrowRight, BarChart3, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, CreditCard, FileSpreadsheet, LayoutGrid, Plus, Repeat, Trash2, TriangleAlert, Upload } from 'lucide-react';
 import type { ManualItem, Tx } from '../lib/types';
 import { bucketName, categoryName, emptyMonth, sumItems, useL, useLang, useStore } from '../lib/store';
 import { dayLabel, isMonthKey, merchantKey, monthLabel, shiftMonth, statementMonth, uid } from '../lib/format';
 import { parseStatementFile, type ParsedStatement } from '../lib/parser/statement';
 import { isTransfer, sourceOf } from '../lib/learn';
-import { AmountInput, BUCKET_COLOR, Button, Card, Dot, IconButton, Money, MonthSwitcher, Segmented, TextInput, cx } from '../components/ui';
+import { AmountInput, BUCKET_COLOR, Button, Card, Dot, IconButton, Money, Segmented, TextInput, cx } from '../components/ui';
 import { IncomeEditor } from './Goal';
 
 const STEPS = 4;
@@ -33,6 +33,54 @@ function reviewQueue(txs: Tx[]): ReviewItem[] {
   return [...map.values()].sort((a, b) => Math.abs(b.amount) - Math.abs(a.amount));
 }
 
+/**
+ * The month being filled in, as a chip that opens the list of months. A list (rather than
+ * previous/next arrows) shows at a glance which months are done, and cannot be nudged by accident
+ * in the middle of a step.
+ */
+function MonthPicker({ value, latest, onPick }: { value: string; latest: string; onPick: (key: string) => void }) {
+  const L = useL();
+  const lang = useLang();
+  const months = useStore((s) => s.db.months);
+  const [open, setOpen] = useState(false);
+  // From the month being lived now, back through the last half year; plus the open one if it is older.
+  const keys = Array.from({ length: 8 }, (_, i) => shiftMonth(latest, 1 - i));
+  if (!keys.includes(value)) keys.push(value);
+  const status = (k: string) => {
+    const m = months[k];
+    if (m && (m.txs.length > 0 || m.manual.length > 0)) return { text: L('מולא', 'Filled'), tone: 'text-good' };
+    if (m && (m.incomes.length > 0 || m.goal)) return { text: L('התחלת', 'Started'), tone: 'text-warn' };
+    return { text: L('ריק', 'Empty'), tone: 'text-muted' };
+  };
+  return (
+    <div className="relative">
+      <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} aria-haspopup="listbox"
+        className="press flex h-10 items-center gap-1.5 rounded-xl border border-line bg-surface2 px-3 text-sm font-semibold">
+        <CalendarDays size={16} className="text-accent" />{monthLabel(value, lang)}<ChevronDown size={16} className={cx('text-muted transition-transform', open && 'rotate-180')} />
+      </button>
+      {open && (
+        <>
+          <button type="button" aria-label={L('סגור', 'Close')} className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <ul role="listbox" className="rise absolute start-0 top-full z-50 mt-1.5 w-60 rounded-2xl border border-line bg-surface p-1.5 shadow-2xl">
+            {keys.map((k) => {
+              const st = status(k);
+              return (
+                <li key={k}>
+                  <button type="button" role="option" aria-selected={k === value} onClick={() => { setOpen(false); if (k !== value) onPick(k); }}
+                    className={cx('press flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-start text-sm', k === value ? 'bg-surface2 font-semibold' : 'hover:bg-surface2')}>
+                    <span>{monthLabel(k, lang)}{k === latest && <span className="ms-1.5 text-xs font-normal text-muted">· {L('האחרון', 'latest')}</span>}</span>
+                    <span className={cx('text-xs', st.tone)}>{st.text}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function MonthPage() {
   const { month = '' } = useParams();
   const [params] = useSearchParams();
@@ -41,7 +89,9 @@ export default function MonthPage() {
   const lang = useLang();
   const db = useStore((s) => s.db);
   const { setIncomes, importStatements, removeFile, moveFile, setManual, setRepeat, applyRecurring, updateMonth, assign, confirm } = useStore();
-  const key = isMonthKey(month) ? month : statementMonth(db.settings.billingDay);
+  // The month whose statement is the latest one out: the default, and where the home shortcut leads.
+  const latest = statementMonth(db.settings.billingDay);
+  const key = isMonthKey(month) ? month : latest;
   const m = db.months[key] ?? emptyMonth(key);
   const Fwd = lang === 'he' ? ArrowLeft : ArrowRight;
   const Back = lang === 'he' ? ChevronRight : ChevronLeft;
@@ -134,7 +184,7 @@ export default function MonthPage() {
             <h1 className="text-2xl font-bold tracking-tight">{monthLabel(key, lang)}</h1>
             <p className="mt-1 text-sm text-muted">{allDone ? L('החודש מוכן', 'This month is ready') : L('החודש עוד לא הושלם', 'This month is not finished yet')}</p>
           </div>
-          <MonthSwitcher value={key} onChange={(k) => navigate(`/month/${k}`)} />
+          <MonthPicker value={key} latest={latest} onPick={(k) => navigate(`/month/${k}`)} />
         </header>
 
         <Card className="!p-2">
@@ -178,9 +228,9 @@ export default function MonthPage() {
     <div className="pb-24">
       {/* Where you are. A segment is also the way back to its step. */}
       <div className="mb-5">
-        <div className="mb-3 flex items-center justify-between text-[13px] text-muted">
-          <span>{monthLabel(key, lang)}</span>
-          <span>{L(`שלב ${step} מתוך ${STEPS}`, `Step ${step} of ${STEPS}`)}</span>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <MonthPicker value={key} latest={latest} onPick={(k) => navigate(`/month/${k}`)} />
+          <span className="text-[13px] text-muted">{L(`שלב ${step} מתוך ${STEPS}`, `Step ${step} of ${STEPS}`)}</span>
         </div>
         <div className="flex gap-1.5" role="list">
           {titles.map(([t], i) => (
