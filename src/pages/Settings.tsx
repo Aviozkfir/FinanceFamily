@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, Download, FileSpreadsheet, RefreshCw, Send, Trash2, Upload } from 'lucide-react';
 import type { BucketId, DB, Split } from '../lib/types';
 import { SPEND_BUCKETS } from '../lib/types';
-import { bucketName, categoryName, useL, useLang, useStore } from '../lib/store';
+import { bucketName, categoryName, useCardLabel, useL, useLang, useStore } from '../lib/store';
 import { isNative } from '../lib/platform';
 import { buildModel } from '../lib/learn';
 import { CURRENT, checkForUpdate, currentChannel, installUpdate, readSnapshot, setChannel, snapshotDate, useUpdate } from '../lib/update';
@@ -35,7 +35,8 @@ export default function SettingsPage() {
   const L = useL();
   const lang = useLang();
   const db = useStore((s) => s.db);
-  const { setSettings, updateCategory, removeCategory, replaceDb } = useStore();
+  const { setSettings, setCardName, updateCategory, removeCategory, replaceDb } = useStore();
+  const cardLabel = useCardLabel();
   const s = db.settings;
   const [split, setSplit] = useState<Split>(s.split);
   const [importMsg, setImportMsg] = useState('');
@@ -75,6 +76,8 @@ export default function SettingsPage() {
   }
 
   const custom = db.categories.filter((c) => !c.builtin);
+  // Every card that ever appeared in a statement, by its last four digits.
+  const cards = useMemo(() => [...new Set(Object.values(db.months).flatMap((m) => m.files.map((f) => f.card)))].filter((c) => c && c !== '????').sort(), [db.months]);
   const learned = useMemo(() => buildModel(db).known.size, [db]);
 
   return (
@@ -109,6 +112,40 @@ export default function SettingsPage() {
         {splitSum !== 100 && <p role="alert" className="mt-3 text-sm text-bad">{L(`החלוקה מסתכמת ב-${splitSum}% — היא תישמר כשתגיע ל-100%.`, `The split adds up to ${splitSum}% — it is saved once it totals 100%.`)}</p>}
       </Section>
 
+      <Section title={L('סיווג', 'Classification')} summary={`${s.smartClassify ? L('סיווג חכם', 'Smart') : L('החלקה', 'Swipe')} · ${s.subcategories ? L('עם תת-קטגוריות', 'with sub-categories') : L('צרכים ורצונות בלבד', 'needs and wants only')}`}>
+        <div className="space-y-3">
+          <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-surface2 p-4">
+            <input type="checkbox" checked={s.subcategories} onChange={(e) => setSettings({ subcategories: e.target.checked })} className="mt-1 h-4 w-4 accent-[var(--accent)]" />
+            <span>
+              <span className="block text-sm font-semibold">{L('תת-קטגוריות', 'Sub-categories')}</span>
+              <span className="block text-[13px] text-muted">{L('סופר, רכב, אוכל בחוץ ועוד, בתוך צרכים ורצונות. כשכבוי, יש רק צרכים, רצונות ו"לא לספור", בסיווג ובניתוח. שום דבר לא נמחק: הדלקה מחזירה את הפירוט.', 'Groceries, car, eating out and more, inside needs and wants. Off: only needs, wants and "don\'t count", in classification and in the analysis. Nothing is deleted: switching back on brings the detail back.')}</span>
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-surface2 p-4">
+            <input type="checkbox" checked={s.smartClassify} onChange={(e) => setSettings({ smartClassify: e.target.checked })} className="mt-1 h-4 w-4 accent-[var(--accent)]" />
+            <span>
+              <span className="block text-sm font-semibold">{L('סיווג חכם', 'Smart classification')}</span>
+              <span className="block text-[13px] text-muted">{L('האפליקציה לומדת מהבחירות שלך, מסווגת לבד בתי עסק שהיא מכירה ומנחשת חדשים, ואתה עובר רק על מה שהיא לא בטוחה לגביו. כשכבוי, כל עסקה מוצגת לך בכרטיס: גוררים שמאלה לצרכים וימינה לרצונות.', 'The app learns from your choices, places merchants it knows by itself and guesses new ones, and you go over only what it is unsure about. Off: each transaction is shown on a card — drag left for needs and right for wants.')}</span>
+            </span>
+          </label>
+        </div>
+      </Section>
+
+      <Section title={L('כרטיסים', 'Cards')} summary={cards.length ? cards.map((c) => cardLabel(c)).join(' · ') : L('עוד לא הועלה דף חיוב', 'No statement uploaded yet')}>
+        {cards.length ? (
+          <ul className="space-y-2">
+            {cards.map((c) => (
+              <li key={c} className="flex items-center gap-2">
+                <span className="w-14 shrink-0 text-sm text-muted" dir="ltr">•••• {c}</span>
+                <TextInput value={db.cardNames[c] ?? ''} placeholder={L('שם לכרטיס', 'A name for the card')} onChange={(e) => setCardName(c, e.target.value)} className="flex-1" aria-label={L(`שם לכרטיס ${c}`, `Name for card ${c}`)} />
+              </li>
+            ))}
+          </ul>
+        ) : <p className="text-sm text-muted">{L('הכרטיסים יופיעו כאן אחרי העלאת דף חיוב ראשון.', 'Cards appear here after the first statement is uploaded.')}</p>}
+        <p className="mt-3 text-[13px] text-muted">{L('השם מוצג ליד כל עסקה במקום ארבע הספרות.', 'The name is shown next to every transaction instead of the four digits.')}</p>
+      </Section>
+
+      {s.subcategories && (
       <Section title={L('קטגוריות', 'Categories')} summary={L(`${custom.length} קטגוריות · ${learned} בתי עסק נלמדו`, `${custom.length} categories · ${learned} merchants learned`)}>
         <p className="mb-3 text-[13px] text-muted">{L('אפשר לשנות שם, להעביר בין צרכים לרצונות או למחוק. קטגוריות חדשות מוסיפים מלוח הסיווג.', 'Rename, move between needs and wants, or delete. New categories are added from the classification board.')}</p>
         {custom.length ? (
@@ -130,6 +167,7 @@ export default function SettingsPage() {
           {L(`האפליקציה למדה ממך ${learned} בתי עסק, ומסווגת אותם ודומים להם לבד בקובץ הבא. היא לומדת רק מבחירות שעשית או אישרת, במכשיר הזה בלבד.`, `The app has learned ${learned} merchants from you, and classifies them and similar ones automatically next time. It learns only from choices you made or confirmed, on this device only.`)}
         </p>
       </Section>
+      )}
 
       <Section title={L('גרסה ועדכונים', 'Version and updates')} summary={<><bdi dir="ltr">{CURRENT.version}</bdi>{native && currentChannel() === 'dev' ? ` · ${L('גרסת פיתוח', 'developer build')}` : ''}{update.phase === 'available' && update.latest ? ` · ${L('יש עדכון', 'update available')}` : ''}</>}>
         <p className="text-sm">

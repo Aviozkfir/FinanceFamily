@@ -104,6 +104,14 @@ export interface Settings {
   split: Split;
   /** Day of the month the card is charged. The statement charged that day is the month's statement. */
   billingDay: number;
+  /** Show and offer the categories inside needs and wants. Off: needs, wants and "don't count" only. */
+  subcategories: boolean;
+  /**
+   * Smart classification: the app places merchants it learned and guesses new ones, and the user
+   * reviews only what it was unsure of. Off (the default): nothing is placed automatically, and every
+   * transaction is swiped, left for needs and right for wants.
+   */
+  smartClassify: boolean;
 }
 
 export interface DB {
@@ -117,4 +125,6 @@ export interface DB {
   recurring: Recurring[];
   /** Set once the ready-made categories were added, so deleting one does not bring it back. */
   presetsAdded?: boolean;
+  /** A name the user gave a card, by its last four digits ("Avi's Visa"). */
+  cardNames: Record<string, string>;
 }

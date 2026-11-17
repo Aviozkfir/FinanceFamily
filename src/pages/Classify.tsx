@@ -1,9 +1,9 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { DndContext, DragOverlay, MouseSensor, TouchSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
-import { ArrowLeftRight, Check, CheckCheck, Globe, Layers, Pencil, Plus, Repeat, Search, Sparkles, Trash2, Wand2, SlidersHorizontal, X } from 'lucide-react';
+import { ArrowLeftRight, Check, CreditCard, CheckCheck, Globe, Layers, Pencil, Plus, Repeat, Search, Sparkles, Trash2, Wand2, SlidersHorizontal, X } from 'lucide-react';
 import type { BucketId, Category, Tx } from '../lib/types';
-import { bucketName, categoryName, emptyMonth, useL, useLang, useStore } from '../lib/store';
+import { bucketName, emptyMonth, offeredCategories, shownCategoryId, shownCategoryName, useCardLabel, useL, useLang, useStore } from '../lib/store';
 import { dayLabel, isMonthKey, merchantKey, money, monthLabel } from '../lib/format';
 import { isTransfer, sourceOf, type Source } from '../lib/learn';
 import { BUCKET_COLOR, Button, Dot, IconButton, Modal, Money, Segmented, TextInput, cx } from '../components/ui';
@@ -13,11 +13,12 @@ interface Item { id: string; txs: Tx[]; merchant: string; amount: number; catego
 const RANK: Record<Source, number> = { user: 0, learned: 1, guess: 2 };
 const weakest = (a: Source | null, b: Source | null): Source | null => (!a ? b : !b ? a : RANK[a] >= RANK[b] ? a : b);
 
+/** Grouped bubbles never mix cards, and a transfer is always on its own: each one paid for something else. */
 function buildItems(txs: Tx[], grouped: boolean): Item[] {
   if (!grouped) return txs.map((t) => ({ id: t.id, txs: [t], merchant: t.merchant, amount: t.amount, categoryId: t.categoryId, source: sourceOf(t), hint: t.hint }));
   const map = new Map<string, Item>();
   for (const t of txs) {
-    const id = `g:${merchantKey(t.merchant)}|${t.categoryId ?? ''}`;
+    const id = isTransfer(t.merchant) ? t.id : `g:${merchantKey(t.merchant)}|${t.card}|${t.categoryId ?? ''}`;
     const it: Item = map.get(id) ?? { id, txs: [], merchant: t.merchant, amount: 0, categoryId: t.categoryId, source: null };
     it.txs.push(t); it.amount += t.amount;
     it.source = weakest(it.source, sourceOf(t)); it.hint ??= t.hint;
@@ -28,6 +29,7 @@ function buildItems(txs: Tx[], grouped: boolean): Item[] {
 
 function BubbleBody({ item, color, selected, overlay, extra }: { item: Item; color: string; selected?: boolean; overlay?: boolean; extra?: number }) {
   const lang = useLang();
+  const cardLabel = useCardLabel();
   const abs = Math.abs(item.amount);
   const size = abs >= 500 ? 'px-4 py-2.5 text-[15px]' : abs >= 100 ? 'px-3.5 py-2 text-sm' : 'px-3 py-1.5 text-[13px]';
   const t0 = item.txs[0];
@@ -38,7 +40,8 @@ function BubbleBody({ item, color, selected, overlay, extra }: { item: Item; col
       style={{ boxShadow: overlay ? undefined : `inset 3px 0 0 ${color}, inset -3px 0 0 ${color}` }}>
       {guess && <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-warn text-[11px] font-bold leading-none text-page">?</span>}
       {item.source === 'learned' && <Sparkles size={12} className="shrink-0 text-muted" />}
-      <bdi className="truncate" style={{ maxWidth: 190 }}>{item.merchant}</bdi>
+      <span className="flex min-w-0 flex-col leading-tight"><bdi className="truncate" style={{ maxWidth: 190 }}>{item.merchant}</bdi>
+        <span className="flex items-center gap-1 truncate text-[11px] font-normal text-muted"><CreditCard size={10} className="shrink-0" /><bdi className="truncate">{cardLabel(t0.card)}</bdi></span></span>
       {item.txs.length > 1 && <span className="rounded-full bg-surface3 px-1.5 text-[11px] text-ink2">×{item.txs.length}</span>}
       {item.txs.some((t) => t.standing) && <Repeat size={12} className="shrink-0 text-muted" />}
       {item.txs.some((t) => t.abroad) && <Globe size={12} className="shrink-0 text-muted" />}
@@ -99,8 +102,9 @@ export default function ClassifyPage() {
   const match = (i: Item) => (!q || i.merchant.toLowerCase().includes(q)) && (!reviewing || i.source === 'guess');
   const pool = items.filter((i) => !i.categoryId);
   // Needs first, then wants, then "don't count"; inside each, the plain "other" one comes last.
-  const cats = BUCKETS.flatMap((b) => { const inB = db.categories.filter((c) => c.bucket === b); return [...inB.filter((c) => !c.builtin), ...inB.filter((c) => c.builtin)]; });
-  const catById = new Map(cats.map((c) => [c.id, c]));
+  const cats = offeredCategories(db);
+  const subs = db.settings.subcategories;
+  const catById = new Map(db.categories.map((c) => [c.id, c]));
   const colorOf = (categoryId: string | null) => BUCKET_COLOR[categoryId ? catById.get(categoryId)?.bucket ?? 'none' : 'none'];
 
   // Selection ids can go stale when grouping changes or items move.
@@ -187,7 +191,7 @@ export default function ClassifyPage() {
             <div className={cx('flex items-center justify-between', pool.length > 0 && 'mb-2.5')}>
               <h2 className="flex items-center gap-2 text-sm font-semibold">{pool.length ? <Dot color="var(--neutral-mark)" /> : <Check size={16} className="text-good" strokeWidth={3} />}{pool.length ? L('ממתינות לסיווג', 'Waiting to be classified') : m.txs.length ? L('הכול מסווג', 'Everything is classified') : L('אין עסקאות בחודש הזה', 'No transactions this month')}</h2>
               {pool.length > 0 && <span className="flex items-center gap-2 text-sm text-muted">{pool.length} · <Money value={pool.reduce((s, i) => s + i.amount, 0)} />
-                <IconButton label={L('הצע סיווג', 'Suggest a category')} className="!h-8 !w-8" onClick={autoClassify}><Wand2 size={15} /></IconButton></span>}
+                {db.settings.smartClassify && <IconButton label={L('הצע סיווג', 'Suggest a category')} className="!h-8 !w-8" onClick={autoClassify}><Wand2 size={15} /></IconButton>}</span>}
             </div>
             {pool.length ? (
               <div className="flex flex-wrap gap-2">
@@ -200,17 +204,18 @@ export default function ClassifyPage() {
           <div className="p-4 pb-24 lg:overflow-y-auto lg:pb-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {cats.map((c, idx) => {
-                const inCat = items.filter((i) => i.categoryId === c.id);
+                // Without sub-categories, what was filed under one shows in its bucket.
+                const inCat = items.filter((i) => shownCategoryId(db, i.categoryId) === c.id);
                 return (
                   <Fragment key={c.id}>
-                  {(idx === 0 || cats[idx - 1].bucket !== c.bucket) && c.bucket !== 'ignore' && (
+                  {subs && (idx === 0 || cats[idx - 1].bucket !== c.bucket) && c.bucket !== 'ignore' && (
                     <h3 className="flex items-center gap-2 pt-1 text-sm font-semibold text-ink2 sm:col-span-2"><Dot color={BUCKET_COLOR[c.bucket]} />{bucketName(c.bucket, lang)}</h3>
                   )}
                   <Zone id={c.id} className={cx('flex flex-col rounded-2xl border border-line bg-surface p-3', inCat.length ? 'min-h-24' : 'min-h-0')}>
                     <div className={cx('flex items-center gap-2', inCat.length > 0 && 'mb-2')}>
                       <Dot color={BUCKET_COLOR[c.bucket]} className="!h-3 !w-3" />
                       <div className="min-w-0 flex-1">
-                        <p className="truncate font-semibold">{categoryName(c, lang)}</p>
+                        <p className="truncate font-semibold">{shownCategoryName(db, c, lang)}</p>
                       </div>
                       <span className="text-end text-sm"><Money value={inCat.reduce((s, i) => s + i.amount, 0)} className="font-bold" /><span className="block text-xs text-muted">{inCat.reduce((s, i) => s + i.txs.length, 0)}</span></span>
                       {!c.builtin && <IconButton label={L('עריכת קטגוריה', 'Edit category')} className="!h-7 !w-7" onClick={() => setCatModal({ id: c.id, name: c.name, bucket: c.bucket })}><Pencil size={13} /></IconButton>}
@@ -223,11 +228,11 @@ export default function ClassifyPage() {
                   </Fragment>
                 );
               })}
-              <button onClick={() => setCatModal({ name: '', bucket: 'wants' })}
+              {subs && <button onClick={() => setCatModal({ name: '', bucket: 'wants' })}
                 className="flex min-h-24 flex-col items-center justify-center gap-1 rounded-2xl border-2 border-dashed border-line-strong text-muted transition-colors hover:border-accent hover:text-ink">
                 <Plus size={22} /><span className="text-sm font-semibold">{L('קטגוריה חדשה', 'New category')}</span>
                 <span className="px-4 text-center text-xs">{L('למשל: מסעדות, רכב, ילדים', 'e.g. Restaurants, Car, Kids')}</span>
-              </button>
+              </button>}
             </div>
           </div>
         </div>
@@ -245,7 +250,7 @@ export default function ClassifyPage() {
             )}
             {cats.map((c) => (
               <button key={c.id} onClick={() => moveItems(selected, c.id)} className="flex items-center gap-1.5 rounded-full border border-line bg-surface px-3 py-1.5 text-[13px] font-medium hover:border-accent">
-                <Dot color={BUCKET_COLOR[c.bucket]} />{categoryName(c, lang)}
+                <Dot color={BUCKET_COLOR[c.bucket]} />{shownCategoryName(db, c, lang)}
               </button>
             ))}
             <button onClick={() => moveItems(selected, null)} className="rounded-full px-3 py-1.5 text-[13px] text-ink2 hover:bg-surface">{L('בטל סיווג', 'Unclassify')}</button>

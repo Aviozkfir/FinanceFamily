@@ -2,9 +2,9 @@
 // stood out; everything else is one tap away rather than on the page.
 import { useMemo, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowDown, ArrowUp, Check, ChevronDown, CircleAlert, CircleCheck, Info, Pencil, TriangleAlert } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, ChevronDown, CircleAlert, CircleCheck, Info, Pencil, TriangleAlert, CreditCard } from 'lucide-react';
 import type { SpendBucket, Tx } from '../lib/types';
-import { bucketName, categoryName, emptyMonth, useL, useLang, useStore } from '../lib/store';
+import { bucketName, emptyMonth, offeredCategories, shownCategoryName, useCardLabel, useL, useLang, useStore } from '../lib/store';
 import { dayLabel, isMonthKey, merchantKey, money, monthLabel, pct, statementMonth } from '../lib/format';
 import { analyzeMonth, previousAnalysis } from '../lib/analysis/compute';
 import { buildInsights, topInsights, type Tone } from '../lib/analysis/insights';
@@ -40,6 +40,7 @@ export default function AnalysisPage() {
   const lang = useLang();
   const db = useStore((s) => s.db);
   const { assign } = useStore();
+  const cardLabel = useCardLabel();
   const key = isMonthKey(month) ? month : statementMonth(db.settings.billingDay);
   const m = db.months[key] ?? emptyMonth(key);
 
@@ -70,7 +71,7 @@ export default function AnalysisPage() {
     );
   }
 
-  const cats = db.categories.filter((c) => c.bucket !== 'invest');
+  const cats = offeredCategories(db);
   const catById = new Map(db.categories.map((c) => [c.id, c]));
   const bucketOfTx = (t: Tx) => (t.categoryId ? catById.get(t.categoryId)?.bucket ?? null : null);
   const hasIncome = a.income > 0;
@@ -229,7 +230,7 @@ export default function AnalysisPage() {
               <li key={c.id} className="flex items-center gap-3 py-2.5">
                 {c.diff > 0 ? <ArrowUp size={18} className="shrink-0 text-bad" /> : <ArrowDown size={18} className="shrink-0 text-good" />}
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{categoryName(catById.get(c.id), lang)}</p>
+                  <p className="truncate font-medium">{shownCategoryName(db, catById.get(c.id), lang)}</p>
                   <p className="text-[13px] text-muted"><Money value={c.before} /> {lang === 'he' ? '←' : '→'} <Money value={c.now} /></p>
                 </div>
                 <span className="shrink-0 text-end font-semibold">{c.diff > 0 ? L('עלה ב-', 'Up ') : L('ירד ב-', 'Down ')}<Money value={Math.abs(c.diff)} /></span>
@@ -254,7 +255,7 @@ export default function AnalysisPage() {
                 <li key={c.id}>
                   <button type="button" onClick={() => { setOpenCat(isOpen ? null : c.id); setOpen(null); setShowAll(false); }} aria-expanded={isOpen} className="press -mx-2 block w-[calc(100%+1rem)] rounded-xl px-2 py-2 text-start hover:bg-surface2">
                     <span className="mb-1.5 flex items-baseline justify-between gap-3">
-                      <span className="min-w-0 truncate font-medium">{categoryName(catById.get(c.id), lang)}<span className="ms-2 text-xs font-normal text-muted">{tabTotal > 0 ? pct(c.total / tabTotal) : ''}</span></span>
+                      <span className="min-w-0 truncate font-medium">{shownCategoryName(db, catById.get(c.id), lang)}<span className="ms-2 text-xs font-normal text-muted">{tabTotal > 0 ? pct(c.total / tabTotal) : ''}</span></span>
                       <span className="flex shrink-0 items-center gap-1"><Money value={c.total} className="font-semibold" /><ChevronDown size={15} className={cx('text-muted transition-transform', isOpen && 'rotate-180')} /></span>
                     </span>
                     <span className="block h-2.5 rounded-full bg-surface2"><span className="grow block h-full rounded-full" style={{ width: `${Math.max((Math.max(c.total, 0) / maxCat) * 100, 1)}%`, background: tabColor }} /></span>
@@ -277,13 +278,14 @@ export default function AnalysisPage() {
                         {txsOf(x.k).map((t) => (
                           <li key={t.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
                             <span className="w-14 shrink-0 text-muted">{dayLabel(t.date, lang)}</span>
+                          <span className="flex max-w-28 items-center gap-1 truncate text-xs text-muted"><CreditCard size={12} className="shrink-0" /><bdi className="truncate">{cardLabel(t.card)}</bdi></span>
                             <Money value={t.amount} agorot className={cx('me-auto font-medium', t.amount < 0 && 'text-good')} />
                             {t.installment && <span className="text-xs text-muted" dir="ltr">{t.installment.n}/{t.installment.of}</span>}
                             {sourceOf(t) === 'guess' && <span className="flex h-4 w-4 items-center justify-center rounded-full bg-warn text-[11px] font-bold text-page" title={L('ניחוש', 'Guess')}>?</span>}
                             <select value={t.categoryId ?? ''} onChange={(e) => assign(key, [t.id], e.target.value || null)} aria-label={L('קטגוריה', 'Category')}
                               className="max-w-40 rounded-lg border border-line bg-surface px-2 py-1 text-sm focus:border-accent focus:outline-none">
                               <option value="">{L('לא מסווג', 'Unclassified')}</option>
-                              {cats.map((c) => <option key={c.id} value={c.id}>{categoryName(c, lang)}</option>)}
+                              {cats.map((c) => <option key={c.id} value={c.id}>{shownCategoryName(db, c, lang)}</option>)}
                             </select>
                           </li>
                         ))}
@@ -317,13 +319,14 @@ export default function AnalysisPage() {
                       {txsOf(x.k).map((t) => (
                         <li key={t.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
                           <span className="w-14 shrink-0 text-muted">{dayLabel(t.date, lang)}</span>
+                          <span className="flex max-w-28 items-center gap-1 truncate text-xs text-muted"><CreditCard size={12} className="shrink-0" /><bdi className="truncate">{cardLabel(t.card)}</bdi></span>
                           <Money value={t.amount} agorot className={cx('me-auto font-medium', t.amount < 0 && 'text-good')} />
                           {t.installment && <span className="text-xs text-muted" dir="ltr">{t.installment.n}/{t.installment.of}</span>}
                           {sourceOf(t) === 'guess' && <span className="flex h-4 w-4 items-center justify-center rounded-full bg-warn text-[11px] font-bold text-page" title={L('ניחוש', 'Guess')}>?</span>}
                           <select value={t.categoryId ?? ''} onChange={(e) => assign(key, [t.id], e.target.value || null)} aria-label={L('קטגוריה', 'Category')}
                             className="max-w-40 rounded-lg border border-line bg-surface px-2 py-1 text-sm focus:border-accent focus:outline-none">
                             <option value="">{L('לא מסווג', 'Unclassified')}</option>
-                            {cats.map((c) => <option key={c.id} value={c.id}>{categoryName(c, lang)}</option>)}
+                            {cats.map((c) => <option key={c.id} value={c.id}>{shownCategoryName(db, c, lang)}</option>)}
                           </select>
                         </li>
                       ))}

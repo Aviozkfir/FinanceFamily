@@ -81,9 +81,11 @@ export function analyzeMonth(month: MonthData, db: DB): MonthAnalysis {
     if (bucket === 'ignore') { ignored += amount; return; }
     if (bucket === 'invest') { setAside += amount; return; }
     spent[bucket] += amount;
-    const row = catRows.get(categoryId!) ?? { id: categoryId!, bucket, total: 0, count: 0 };
+    // Without sub-categories, every category of a bucket is counted as the bucket itself.
+    const rowId = db.settings.subcategories ? categoryId! : bucket;
+    const row = catRows.get(rowId) ?? { id: rowId, bucket, total: 0, count: 0 };
     row.total += amount; row.count++;
-    catRows.set(categoryId!, row);
+    catRows.set(rowId, row);
   };
 
   for (const t of month.txs) {

@@ -18,12 +18,13 @@ const BUILTIN: Category[] = [
 
 const emptyDb = (): DB => ({
   version: 1,
-  settings: { lang: 'he', theme: 'dark', split: DEFAULT_SPLIT, billingDay: 10 },
+  settings: { lang: 'he', theme: 'dark', split: DEFAULT_SPLIT, billingDay: 10, subcategories: true, smartClassify: false },
   categories: [...BUILTIN, ...presetCategories()],
   merchantRules: {},
   months: {},
   recurring: [],
   presetsAdded: true,
+  cardNames: {},
 });
 
 export const emptyMonth = (key: string): MonthData => ({ key, incomes: [], files: [], txs: [], manual: [] });
@@ -54,7 +55,7 @@ function normalize(raw: DB): DB {
     return [k, { ...m, txs: (m.txs ?? []).map((t) => (t.categoryId && savings.has(t.categoryId) ? { ...t, categoryId: 'ignore' } : { ...t, categoryId: refine(t.merchant, t.categoryId) })) }];
   }));
   const merchantRules = Object.fromEntries(Object.entries(raw.merchantRules ?? {}).map(([k, c]) => [k, savings.has(c) ? 'ignore' : refine(k, c)!]));
-  return { version: 1, settings, categories, merchantRules, months, recurring: raw.recurring ?? [], presetsAdded: true };
+  return { version: 1, settings, categories, merchantRules, months, recurring: raw.recurring ?? [], presetsAdded: true, cardNames: raw.cardNames ?? {} };
 }
 
 type SaveState = 'idle' | 'saving' | 'saved' | 'error';
@@ -87,6 +88,8 @@ interface Store {
   /** Copies into a month the standing orders it does not have yet. Safe to call any time. */
   applyRecurring: (key: string) => void;
   setIncomes: (key: string, items: IncomeItem[]) => void;
+  /** Gives a card a name; an empty name goes back to its last four digits. */
+  setCardName: (card: string, name: string) => void;
   deleteMonth: (key: string) => void;
   replaceDb: (db: DB) => void;
 }
@@ -174,7 +177,8 @@ export const useStore = create<Store>((set, get) => {
             const idKey = txIdentity(t);
             if (seen.has(idKey)) { skipped++; continue; }
             seen.add(idKey);
-            const s = suggest(model, t.merchant);
+            // Only smart classification places anything by itself; otherwise every transaction waits for the user.
+            const s = db.settings.smartClassify ? suggest(model, t.merchant) : null;
             fresh.push({ ...t, fileId, categoryId: s?.categoryId ?? null, ...(s ? { by: s.by, ...(s.hint ? { hint: s.hint } : {}) } : {}) });
           }
           if (!fresh.length) continue;
@@ -296,6 +300,11 @@ export const useStore = create<Store>((set, get) => {
     }),
     applyRecurring: (key) => { if (pendingRecurring(get().db, key).length) mutate((db) => withRecurring(db, key)); },
     setIncomes: (key, items) => mutate((db) => withMonth(db, key, (m) => ({ ...m, incomes: items }))),
+    setCardName: (card, name) => mutate((db) => {
+      const cardNames = { ...db.cardNames };
+      if (name.trim()) cardNames[card] = name.trim(); else delete cardNames[card];
+      return { ...db, cardNames };
+    }),
     deleteMonth: (key) => mutate((db) => { const { [key]: _gone, ...months } = db.months; return { ...db, months }; }),
     replaceDb: (db) => mutate(() => normalize(db)),
   };
@@ -323,3 +332,29 @@ export const categoryName = (c: Category | undefined, lang: Lang) =>
     : c.builtin ? OTHER[c.bucket]?.[lang === 'he' ? 0 : 1] ?? bucketName(c.bucket, lang)
       : c.name || (c.preset && presetName(c.preset, lang)) || '';
 export const sumItems = (items: { amount: number }[]) => items.reduce((s, i) => s + (Number(i.amount) || 0), 0);
+
+/** A card as people know it: the name they gave it, or its last four digits. */
+export const cardLabel = (names: Record<string, string> | undefined, card: string) => names?.[card] || `•••• ${card}`;
+export const useCardLabel = () => {
+  const names = useStore((s) => s.db.cardNames);
+  return (card: string) => cardLabel(names, card);
+};
+
+/**
+ * The categories offered for classifying, in display order: needs, wants, "don't count", the
+ * plain one of each bucket last. Without sub-categories only the plain ones are offered.
+ */
+export function offeredCategories(db: DB): Category[] {
+  return (['needs', 'wants', 'ignore'] as BucketId[]).flatMap((b) => {
+    const inB = db.categories.filter((c) => c.bucket === b);
+    return db.settings.subcategories ? [...inB.filter((c) => !c.builtin), ...inB.filter((c) => c.builtin)] : inB.filter((c) => c.builtin);
+  });
+}
+/** Without sub-categories, a transaction filed under one is shown under its bucket. */
+export const shownCategoryId = (db: DB, id: string | null): string | null => {
+  if (!id || db.settings.subcategories) return id;
+  return db.categories.find((c) => c.id === id)?.bucket ?? id;
+};
+/** The name of a category as shown: without sub-categories the plain ones read "Needs", not "Other needs". */
+export const shownCategoryName = (db: DB, c: Category | undefined, lang: Lang) =>
+  c && c.builtin && !db.settings.subcategories ? bucketName(c.bucket, lang) : categoryName(c, lang);

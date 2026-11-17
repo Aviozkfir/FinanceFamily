@@ -3,7 +3,7 @@
 import { registerPlugin } from '@capacitor/core';
 import type { DB } from './types';
 import { isNative } from './platform';
-import { bucketName, categoryName } from './store';
+import { bucketName, cardLabel, categoryName } from './store';
 
 const AppFiles = registerPlugin<{ share(o: { name: string; text: string; mime: string }): Promise<void> }>('AppFiles');
 
@@ -28,7 +28,7 @@ export function exportTransactions(db: DB, lang: 'he' | 'en'): Promise<void> {
   const rows = Object.keys(db.months).sort().flatMap((key) =>
     [...db.months[key].txs].sort((a, b) => a.date.localeCompare(b.date)).map((t) => {
       const c = t.categoryId ? cats.get(t.categoryId) : undefined;
-      return [key, t.date, t.merchant, t.amount.toFixed(2), categoryName(c, lang), c ? bucketName(c.bucket, lang) : '', t.card, t.note ?? ''];
+      return [key, t.date, t.merchant, t.amount.toFixed(2), categoryName(c, lang), c ? bucketName(c.bucket, lang) : '', cardLabel(db.cardNames, t.card), t.note ?? ''];
     }));
   // The leading mark makes Excel read Hebrew correctly.
   const csv = '﻿' + [head, ...rows].map((r) => r.map(cell).join(',')).join('\r\n') + '\r\n';

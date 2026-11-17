@@ -7,7 +7,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowLeftRight, ArrowRight, BarChart3, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, CreditCard, FileSpreadsheet, LayoutGrid, Plus, Repeat, Trash2, TriangleAlert, Upload } from 'lucide-react';
 import type { ManualItem, Tx } from '../lib/types';
-import { bucketName, categoryName, emptyMonth, sumItems, useL, useLang, useStore } from '../lib/store';
+import { bucketName, categoryName, emptyMonth, offeredCategories, shownCategoryName, sumItems, useCardLabel, useL, useLang, useStore } from '../lib/store';
+import SwipeDeck from '../components/SwipeDeck';
 import { dayLabel, isMonthKey, merchantKey, monthLabel, shiftMonth, statementMonth, uid } from '../lib/format';
 import { parseStatementFile, type ParsedStatement } from '../lib/parser/statement';
 import { isTransfer, sourceOf } from '../lib/learn';
@@ -17,15 +18,16 @@ import { IncomeEditor } from './Goal';
 const STEPS = 4;
 
 /** One merchant the user still has to decide about: every waiting transaction of it, taken together. */
-interface ReviewItem { id: string; merchant: string; txs: Tx[]; amount: number; suggested: string | null; hint?: string }
+interface ReviewItem { id: string; merchant: string; card: string; txs: Tx[]; amount: number; suggested: string | null; hint?: string }
 
 function reviewQueue(txs: Tx[]): ReviewItem[] {
   const map = new Map<string, ReviewItem>();
   for (const t of txs) {
     const source = sourceOf(t);
     if (source === 'user' || source === 'learned') continue;
-    const id = `${merchantKey(t.merchant)}|${t.categoryId ?? ''}`;
-    const it = map.get(id) ?? { id, merchant: t.merchant, txs: [], amount: 0, suggested: t.categoryId, hint: t.hint };
+    // A transfer is asked about on its own (each paid for something else), and a group never mixes cards.
+    const id = isTransfer(t.merchant) ? t.id : `${merchantKey(t.merchant)}|${t.card}|${t.categoryId ?? ''}`;
+    const it = map.get(id) ?? { id, merchant: t.merchant, card: t.card, txs: [], amount: 0, suggested: t.categoryId, hint: t.hint };
     it.txs.push(t); it.amount += t.amount;
     map.set(id, it);
   }
@@ -104,7 +106,9 @@ export default function MonthPage() {
   const L = useL();
   const lang = useLang();
   const db = useStore((s) => s.db);
-  const { setIncomes, importStatements, removeFile, moveFile, setManual, setRepeat, applyRecurring, updateMonth, assign, confirm } = useStore();
+  const cardLabel = useCardLabel();
+  const [cardDraft, setCardDraft] = useState<Record<string, string>>({});
+  const { setCardName, setIncomes, importStatements, removeFile, moveFile, setManual, setRepeat, applyRecurring, updateMonth, assign, confirm } = useStore();
   // The month whose statement is the latest one out: the default, and where the home shortcut leads.
   const latest = statementMonth(db.settings.billingDay);
   const key = isMonthKey(month) ? month : latest;
@@ -116,9 +120,12 @@ export default function MonthPage() {
   useEffect(() => { applyRecurring(key); }, [key, applyRecurring]);
 
   const incomeTotal = sumItems(m.incomes);
+  const smart = db.settings.smartClassify;
+  // Smart: only what the classifier was unsure about. Swipe: every transaction not yet placed.
   const queue = useMemo(() => reviewQueue(m.txs), [m.txs]);
+  const pending = smart ? queue.length : m.txs.filter((t) => !t.categoryId).length;
   const started = incomeTotal > 0 || m.txs.length > 0 || m.manual.length > 0;
-  const done = [incomeTotal > 0, m.files.length > 0, m.txs.length > 0 && queue.length === 0, true];
+  const done = [incomeTotal > 0, m.files.length > 0, m.txs.length > 0 && pending === 0, true];
   const canAnalyze = m.txs.length > 0 || m.manual.length > 0;
 
   const requested = Number(params.get('s'));
@@ -168,7 +175,7 @@ export default function MonthPage() {
   const ordered = [...queue.filter((q) => !skipped.includes(q.id)), ...queue.filter((q) => skipped.includes(q.id))];
   const current = ordered[0];
   const total = Math.max(reviewTotal.current, queue.length);
-  const cats = db.categories.filter((c) => c.bucket !== 'invest');
+  const cats = offeredCategories(db);
   const catById = new Map(db.categories.map((c) => [c.id, c]));
 
   // ----- step 4 -----
@@ -179,7 +186,7 @@ export default function MonthPage() {
   const titles = [
     [L('הכנסות', 'Income'), L('מה באמת נכנס החודש', 'What actually came in this month')],
     [L('דף החיוב', 'Card statement'), L('קובץ Excel או CSV מאתר חברת האשראי. אפשר כמה קבצים.', 'An Excel or CSV file from your card issuer. Several files are fine.')],
-    [L('סיווג', 'Classification'), L('רק מה שהאפליקציה לא בטוחה לגביו', 'Only what the app is not sure about')],
+    [L('סיווג', 'Classification'), db.settings.smartClassify ? L('רק מה שהאפליקציה לא בטוחה לגביו', 'Only what the app is not sure about') : L('עסקה אחת בכל פעם: שמאלה לצרכים, ימינה לרצונות', 'One transaction at a time: left for needs, right for wants')],
     [L('מחוץ לאשראי', 'Outside the card'), L('שכר דירה, הוראות קבע, מזומן. אפשר לדלג.', 'Rent, standing orders, cash. You can skip this.')],
   ];
 
@@ -190,7 +197,7 @@ export default function MonthPage() {
     const lines: [string, React.ReactNode][] = [
       [titles[0][0], incomeTotal > 0 ? <Money value={incomeTotal} className="font-semibold" /> : L('לא הוזנו', 'Not entered')],
       [titles[1][0], m.files.length ? <>{L(m.files.length === 1 ? 'קובץ אחד' : `${m.files.length} קבצים`, `${m.files.length} file${m.files.length === 1 ? '' : 's'}`)} · <Money value={m.files.reduce((t, f) => t + f.total, 0)} /></> : L('לא הועלה', 'Not uploaded')],
-      [titles[2][0], !m.txs.length ? L('אין עסקאות', 'No transactions') : queue.length ? L(`${queue.length} מחכים להחלטה`, `${queue.length} waiting for you`) : L(`כל ${m.txs.length} העסקאות סווגו`, `All ${m.txs.length} classified`)],
+      [titles[2][0], !m.txs.length ? L('אין עסקאות', 'No transactions') : pending ? L(`${pending} מחכים להחלטה`, `${pending} waiting for you`) : L(`כל ${m.txs.length} העסקאות סווגו`, `All ${m.txs.length} classified`)],
       [titles[3][0], m.manual.length ? L(m.manual.length === 1 ? 'שורה אחת' : `${m.manual.length} שורות`, `${m.manual.length} line${m.manual.length === 1 ? '' : 's'}`) : L('אין', 'None')],
     ];
     return (
@@ -310,13 +317,21 @@ export default function MonthPage() {
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold"><bdi>{f.name}</bdi></p>
                       <p className="flex flex-wrap items-center gap-x-2 text-[13px] text-muted">
-                        <span className="flex items-center gap-1"><CreditCard size={13} />{f.card}</span>
+                        <span className="flex items-center gap-1"><CreditCard size={13} /><bdi>{cardLabel(f.card)}</bdi></span>
                         <span>{L(`${f.count} עסקאות`, `${f.count} transactions`)}</span>
                       </p>
                     </div>
                     <Money value={f.total} agorot className="font-semibold" />
                     <IconButton label={L('הסר קובץ', 'Remove file')} onClick={() => removeFile(key, f.id)}><Trash2 size={16} /></IconButton>
                   </div>
+                  {/* A card seen for the first time gets a name, so every transaction can say whose it was. */}
+                  {!db.cardNames[f.card] && (
+                    <form className="mt-2 flex items-center gap-2 border-t border-line pt-2" onSubmit={(e) => { e.preventDefault(); if (cardDraft[f.card]?.trim()) setCardName(f.card, cardDraft[f.card]); }}>
+                      <TextInput value={cardDraft[f.card] ?? ''} onChange={(e) => setCardDraft({ ...cardDraft, [f.card]: e.target.value })}
+                        placeholder={L(`שם לכרטיס ${f.card}, למשל "ויזה של אבי"`, `A name for card ${f.card}, e.g. "Avi's Visa"`)} className="!h-9 flex-1" />
+                      <Button size="sm" type="submit" disabled={!cardDraft[f.card]?.trim()}>{L('שמור', 'Save')}</Button>
+                    </form>
+                  )}
                   {verified && <p className="mt-2 flex items-center gap-1.5 border-t border-line pt-2 text-[13px] text-good"><Check size={14} />{L('הסכום תואם לסך הכול שבדף החיוב', 'The total matches the one printed on the statement')}</p>}
                   {mismatch && (
                     <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-line pt-2 text-[13px] text-warn">
@@ -333,7 +348,13 @@ export default function MonthPage() {
           </div>
         )}
 
-        {step === 3 && (
+        {step === 3 && !smart && (
+          !m.txs.length
+            ? <Card><p className="text-sm text-muted">{L('אין עדיין עסקאות. חזור לשלב הקודם והעלה דף חיוב.', 'No transactions yet. Go back a step and upload a statement.')}</p></Card>
+            : <SwipeDeck monthKey={key} txs={m.txs} />
+        )}
+
+        {step === 3 && smart && (
           !m.txs.length ? (
             <Card><p className="text-sm text-muted">{L('אין עדיין עסקאות. חזור לשלב הקודם והעלה דף חיוב.', 'No transactions yet. Go back a step and upload a statement.')}</p></Card>
           ) : !current ? (
@@ -358,7 +379,7 @@ export default function MonthPage() {
                   <div className="min-w-0">
                     <p className="flex items-center gap-2 text-xl font-bold"><bdi className="truncate">{current.merchant}</bdi>{isTransfer(current.merchant) && <ArrowLeftRight size={16} className="shrink-0 text-muted" />}</p>
                     <p className="mt-0.5 text-[13px] text-muted">
-                      {current.txs.length > 1 ? L(`${current.txs.length} עסקאות`, `${current.txs.length} transactions`) : dayLabel(current.txs[0].date, lang)}
+                      <bdi>{cardLabel(current.card)}</bdi> · {current.txs.length > 1 ? L(`${current.txs.length} עסקאות`, `${current.txs.length} transactions`) : dayLabel(current.txs[0].date, lang)}
                       {current.txs[0].note ? ` · ${current.txs[0].note}` : ''}
                     </p>
                   </div>
@@ -370,7 +391,7 @@ export default function MonthPage() {
                 {current.suggested && catById.get(current.suggested) && (
                   <div className="mt-4 rounded-2xl border border-dashed border-warn p-3">
                     <p className="text-[13px] text-ink2">{L('ההצעה של האפליקציה', "The app's suggestion")}{current.hint ? <> · {L('לפי', 'from')} <bdi>{current.hint}</bdi></> : null}</p>
-                    <p className="mt-1 flex items-center gap-2 text-lg font-bold"><Dot color={BUCKET_COLOR[catById.get(current.suggested)!.bucket]} className="!h-3 !w-3" />{categoryName(catById.get(current.suggested), lang)}</p>
+                    <p className="mt-1 flex items-center gap-2 text-lg font-bold"><Dot color={BUCKET_COLOR[catById.get(current.suggested)!.bucket]} className="!h-3 !w-3" />{shownCategoryName(db, catById.get(current.suggested), lang)}</p>
                     <Button variant="primary" size="lg" className="mt-3 w-full" icon={<Check size={18} />} onClick={() => confirm(key, current.txs.map((t) => t.id))}>{L('נכון', 'Correct')}</Button>
                   </div>
                 )}
@@ -381,12 +402,12 @@ export default function MonthPage() {
                   const list = [...inB.filter((c) => !c.builtin), ...inB.filter((c) => c.builtin)];
                   return (
                     <div key={b} className="mb-3">
-                      {b !== 'ignore' && <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-ink2"><Dot color={BUCKET_COLOR[b]} />{bucketName(b, lang)}</p>}
+                      {b !== 'ignore' && db.settings.subcategories && <p className="mb-1.5 flex items-center gap-1.5 text-xs font-semibold text-ink2"><Dot color={BUCKET_COLOR[b]} />{bucketName(b, lang)}</p>}
                       <div className="grid grid-cols-2 gap-2">
                         {list.map((c) => (
                           <button key={c.id} type="button" onClick={() => assign(key, current.txs.map((t) => t.id), c.id)}
                             className={cx('press flex min-h-11 items-center gap-2 rounded-xl border px-3 py-2 text-start text-sm font-medium', c.id === current.suggested ? 'border-line bg-surface2 text-muted' : 'border-line bg-surface2 hover:border-accent')}>
-                            <Dot color={BUCKET_COLOR[c.bucket]} /><span className="truncate">{categoryName(c, lang)}</span>
+                            <Dot color={BUCKET_COLOR[c.bucket]} /><span className="truncate">{shownCategoryName(db, c, lang)}</span>
                           </button>
                         ))}
                       </div>
