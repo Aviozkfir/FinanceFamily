@@ -1,5 +1,17 @@
 [
   {
+    "version": "1.13.0",
+    "date": "2026-11-17",
+    "he": [
+      "הסיכום של החודש נכנס במסך אחד: כמה חסכת, צרכים ורצונות מול היעד, וארבעה אריחים.",
+      "כל אריח — לאן הלך הכסף, מה השתנה, מה בלט, מה צפוי — נפתח במסך משלו, וכפתור החזרה מחזיר לסיכום."
+    ],
+    "en": [
+      "The month's summary fits on one screen: how much you saved, needs and wants against the plan, and four tiles.",
+      "Each tile — where the money went, what changed, what stood out, coming up — opens its own screen, and Back returns to the summary."
+    ]
+  },
+  {
     "version": "1.12.2",
     "date": "2026-11-17",
     "he": [

@@ -40,7 +40,7 @@ function reviewQueue(txs: Tx[]): ReviewItem[] {
  * previous/next arrows) shows at a glance which months are done, and cannot be nudged by accident
  * in the middle of a step.
  */
-function MonthPicker({ value, latest, onPick }: { value: string; latest: string; onPick: (key: string) => void }) {
+export function MonthPicker({ value, latest, onPick }: { value: string; latest: string; onPick: (key: string) => void }) {
   const L = useL();
   const lang = useLang();
   const months = useStore((s) => s.db.months);
