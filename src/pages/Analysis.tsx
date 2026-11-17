@@ -242,7 +242,7 @@ export default function AnalysisPage() {
 
       {/* Where it went: bucket → category → merchants → transactions */}
       <Card>
-        <CardTitle hint={L('לחץ על קטגוריה כדי לראות את בתי העסק, ועל בית עסק כדי לראות עסקאות ולתקן סיווג', 'Tap a category to see its merchants, and a merchant to see its transactions and fix a category')}>{L('לאן הלך הכסף', 'Where the money went')}</CardTitle>
+        <CardTitle hint={db.settings.subcategories ? L('לחץ על קטגוריה כדי לראות את בתי העסק, ועל בית עסק כדי לראות עסקאות ולתקן סיווג', 'Tap a category to see its merchants, and a merchant to see its transactions and fix a category') : L('לחץ על בית עסק כדי לראות את העסקאות ולתקן סיווג', 'Tap a merchant to see its transactions and fix a category')}>{L('לאן הלך הכסף', 'Where the money went')}</CardTitle>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
           <Segmented size="sm" value={activeTab} onChange={(v) => { setTab(v); setOpen(null); setOpenCat(null); setShowAll(false); }} options={tabs} />
           <Money value={tabTotal} className="font-bold" />

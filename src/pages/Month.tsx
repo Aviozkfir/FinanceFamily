@@ -7,7 +7,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, ArrowLeftRight, ArrowRight, BarChart3, CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, CreditCard, FileSpreadsheet, LayoutGrid, Plus, Repeat, Trash2, TriangleAlert, Upload } from 'lucide-react';
 import type { ManualItem, Tx } from '../lib/types';
-import { bucketName, categoryName, emptyMonth, offeredCategories, shownCategoryName, sumItems, useCardLabel, useL, useLang, useStore } from '../lib/store';
+import { bucketName, emptyMonth, offeredCategories, shownCategoryId, shownCategoryName, sumItems, useCardLabel, useL, useLang, useStore } from '../lib/store';
 import SwipeDeck from '../components/SwipeDeck';
 import { dayLabel, isMonthKey, merchantKey, monthLabel, shiftMonth, previousMonth, uid, spendingMonth } from '../lib/format';
 import { parseStatementFile, type ParsedStatement } from '../lib/parser/statement';
@@ -440,9 +440,11 @@ export default function MonthPage() {
                   <AmountInput value={x.amount} onChange={(amount) => manualPatch(x.id, { amount })} className="w-28" />
                 </div>
                 {x.kind === 'expense' && (
-                  <select value={x.categoryId ?? ''} onChange={(e) => manualPatch(x.id, { categoryId: e.target.value || null })} aria-label={L('קטגוריה', 'Category')}
+                  <select value={shownCategoryId(db, x.categoryId) ?? ''} onChange={(e) => manualPatch(x.id, { categoryId: e.target.value || null })} aria-label={L('קטגוריה', 'Category')}
                     className="mt-2 h-10 w-full rounded-xl border border-line bg-surface2 px-2 text-sm focus:border-accent focus:outline-none">
-                    {db.categories.filter((c) => c.bucket !== 'ignore').map((c) => <option key={c.id} value={c.id}>{categoryName(c, lang)}</option>)}
+                    {/* The same choices as the rest of the app, plus savings for a deposit. Without sub-categories: needs, wants, savings. */}
+                    {[...offeredCategories(db).filter((c) => c.bucket !== 'ignore'), ...db.categories.filter((c) => c.bucket === 'invest')]
+                      .map((c) => <option key={c.id} value={c.id}>{shownCategoryName(db, c, lang)}</option>)}
                   </select>
                 )}
               </Card>

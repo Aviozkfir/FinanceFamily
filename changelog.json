@@ -1,5 +1,15 @@
 [
   {
+    "version": "1.12.2",
+    "date": "2026-11-17",
+    "he": [
+      "כשתת-קטגוריות כבויות, גם בשורות שמחוץ לאשראי מופיעים רק צרכים, רצונות וחיסכון."
+    ],
+    "en": [
+      "With sub-categories off, lines outside the card also offer only needs, wants and savings."
+    ]
+  },
+  {
     "version": "1.12.1",
     "date": "2026-11-17",
     "he": [
