@@ -139,8 +139,21 @@ input[type='number'] { -moz-appearance: textfield; appearance: textfield; }
 /* A section that opens reveals its content instead of snapping. */
 details[open] > summary + * { animation: rise 0.22s ease-out both; }
 
+/* Moving between the steps of a flow: the new screen arrives from the side you are heading to,
+   which in Hebrew is the left. --dir flips the offset with the reading direction. */
+:root { --dir: 1; }
+:root[dir='rtl'] { --dir: -1; }
+@keyframes step-next { from { opacity: 0; transform: translateX(calc(36px * var(--dir))); } }
+@keyframes step-back { from { opacity: 0; transform: translateX(calc(-36px * var(--dir))); } }
+.step-next { animation: step-next 0.28s var(--ease-out) both; }
+.step-back { animation: step-back 0.28s var(--ease-out) both; }
+
+/* A tick that draws itself when something is finished. */
+@keyframes draw { from { stroke-dashoffset: 30; } }
+.draw { stroke-dasharray: 30; animation: draw 0.4s var(--ease-out) 0.15s both; }
+
 @media (prefers-reduced-motion: reduce) {
-  .rise, .grow, .grow-late, .pop, .appear-late, details[open] > summary + * { animation: none; }
+  .rise, .grow, .grow-late, .pop, .appear-late, .step-next, .step-back, .draw, details[open] > summary + * { animation: none; }
   .press:active:not(:disabled) { transform: none; }
   * { transition: none !important; }
 }

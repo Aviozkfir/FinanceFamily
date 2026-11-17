@@ -1,5 +1,21 @@
 [
   {
+    "version": "1.11.0",
+    "date": "2026-11-17",
+    "he": [
+      "מילוי חודש צעד אחרי צעד: הכנסות, דף חיוב, סיווג ומה שמחוץ לאשראי — כל אחד במסך משלו, עם הבא והקודם ומעבר חלק ביניהם.",
+      "סיווג כרטיס אחרי כרטיס: בית עסק אחד בכל פעם, עם ההצעה של האפליקציה וכפתור \"נכון\", או בחירה בקטגוריה אחרת.",
+      "חודש שכבר התחלת נפתח כסיכום, וכל שורה בו קופצת לצעד שלה.",
+      "כפתור החזרה של הטלפון חוזר לצעד הקודם."
+    ],
+    "en": [
+      "Filling in a month step by step: income, statement, classification and what is outside the card — each on its own screen, with Next and Back and a smooth move between them.",
+      "Card-by-card classification: one merchant at a time, with the app's suggestion and a \"Correct\" button, or a tap on another category.",
+      "A month you already started opens as a summary, and each line jumps to its step.",
+      "The phone's back button returns to the previous step."
+    ]
+  },
+  {
     "version": "1.10.0",
     "date": "2026-11-16",
     "he": [
