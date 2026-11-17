@@ -1,5 +1,15 @@
 [
   {
+    "version": "1.11.2",
+    "date": "2026-11-17",
+    "he": [
+      "בחירת החודש כוללת עכשיו בחירת שנה, וכל 12 החודשים של השנה מופיעים ברשימה נגללת."
+    ],
+    "en": [
+      "The month picker now has a year selector, and all 12 months of the year appear in a scrolling list."
+    ]
+  },
+  {
     "version": "1.11.1",
     "date": "2026-11-17",
     "he": [

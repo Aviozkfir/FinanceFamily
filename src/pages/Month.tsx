@@ -43,15 +43,22 @@ function MonthPicker({ value, latest, onPick }: { value: string; latest: string;
   const lang = useLang();
   const months = useStore((s) => s.db.months);
   const [open, setOpen] = useState(false);
-  // From the month being lived now, back through the last half year; plus the open one if it is older.
-  const keys = Array.from({ length: 8 }, (_, i) => shiftMonth(latest, 1 - i));
-  if (!keys.includes(value)) keys.push(value);
+  // Opens on the year of the month being filled in; the arrows move a year at a time.
+  const [year, setYear] = useState(Number(value.slice(0, 4)));
+  useEffect(() => { if (open) setYear(Number(value.slice(0, 4))); }, [open, value]);
+  // Nothing later than the month being lived now can be filled in.
+  const last = shiftMonth(latest, 1);
+  const lastYear = Number(last.slice(0, 4));
+  // December first, so the recent months of the current year are at the top.
+  const keys = Array.from({ length: 12 }, (_, i) => `${year}-${String(12 - i).padStart(2, '0')}`);
   const status = (k: string) => {
     const m = months[k];
+    if (k > last) return { text: L('עוד לא הגיע', 'Not yet'), tone: 'text-muted' };
     if (m && (m.txs.length > 0 || m.manual.length > 0)) return { text: L('מולא', 'Filled'), tone: 'text-good' };
     if (m && (m.incomes.length > 0 || m.goal)) return { text: L('התחלת', 'Started'), tone: 'text-warn' };
     return { text: L('ריק', 'Empty'), tone: 'text-muted' };
   };
+  const Prev = lang === 'he' ? ChevronRight : ChevronLeft, Next = lang === 'he' ? ChevronLeft : ChevronRight;
   return (
     <div className="relative">
       <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} aria-haspopup="listbox"
@@ -61,20 +68,29 @@ function MonthPicker({ value, latest, onPick }: { value: string; latest: string;
       {open && (
         <>
           <button type="button" aria-label={L('סגור', 'Close')} className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
-          <ul role="listbox" className="rise absolute start-0 top-full z-50 mt-1.5 w-60 rounded-2xl border border-line bg-surface p-1.5 shadow-2xl">
-            {keys.map((k) => {
-              const st = status(k);
-              return (
-                <li key={k}>
-                  <button type="button" role="option" aria-selected={k === value} onClick={() => { setOpen(false); if (k !== value) onPick(k); }}
-                    className={cx('press flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-start text-sm', k === value ? 'bg-surface2 font-semibold' : 'hover:bg-surface2')}>
-                    <span>{monthLabel(k, lang)}{k === latest && <span className="ms-1.5 text-xs font-normal text-muted">· {L('האחרון', 'latest')}</span>}</span>
-                    <span className={cx('text-xs', st.tone)}>{st.text}</span>
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
+          <div className="rise absolute start-0 top-full z-50 mt-1.5 w-64 rounded-2xl border border-line bg-surface p-1.5 shadow-2xl">
+            <div className="flex items-center justify-between border-b border-line px-1 pb-1.5">
+              <IconButton label={L('שנה קודמת', 'Previous year')} onClick={() => setYear(year - 1)}><Prev size={18} /></IconButton>
+              <span className="num text-[15px] font-bold" aria-live="polite">{year}</span>
+              <IconButton label={L('שנה הבאה', 'Next year')} disabled={year >= lastYear} onClick={() => setYear(year + 1)}><Next size={18} /></IconButton>
+            </div>
+            <ul role="listbox" className="mt-1.5 max-h-[46dvh] overflow-y-auto overscroll-contain">
+              {keys.map((k) => {
+                const st = status(k), future = k > last;
+                return (
+                  <li key={k}>
+                    {/* The open month scrolls itself into view when the list appears. */}
+                    <button type="button" role="option" aria-selected={k === value} disabled={future} ref={k === value ? (el) => el?.scrollIntoView({ block: 'center' }) : undefined}
+                      onClick={() => { setOpen(false); if (k !== value) onPick(k); }}
+                      className={cx('press flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-start text-sm', k === value ? 'bg-surface2 font-semibold' : 'hover:bg-surface2', future && 'opacity-45')}>
+                      <span>{monthLabel(k, lang).replace(/\s*\d{4}$/, '')}{k === latest && <span className="ms-1.5 text-xs font-normal text-muted">· {L('האחרון', 'latest')}</span>}</span>
+                      <span className={cx('text-xs', st.tone)}>{st.text}</span>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         </>
       )}
     </div>
